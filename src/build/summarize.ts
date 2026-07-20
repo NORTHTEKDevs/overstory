@@ -1,0 +1,150 @@
+import { z } from 'zod';
+import { chunkFile } from '../core/chunk.js';
+import { makeSpan } from '../core/gate.js';
+import type { Claim, CorpusSnapshot, SpanRef } from '../core/types.js';
+import type { ChatProvider } from '../llm/provider.js';
+
+const DECL_RE =
+  /^(export\s|function\s|class\s|def\s|async def\s|fn\s|pub\s|impl\s|interface\s|type\s|const\s|let\s|var\s|struct\s|enum\s|mod\s|module\s|public\s|private\s)/u;
+const HEADING_RE = /^(#{1,3}) (.+)$/u;
+
+const claimDraftSchema = z.object({
+  text: z.string().min(3),
+  startLine: z.number().int().min(1),
+  endLine: z.number().int().min(1),
+});
+const claimsSchema = z.object({ claims: z.array(claimDraftSchema).min(1).max(12) });
+export type ClaimDraft = z.infer<typeof claimDraftSchema>;
+
+export const numberedLines = (lines: string[], startLine: number): string =>
+  lines.map((l, i) => `${startLine + i}: ${l}`).join('\n');
+
+const SUMMARIZE_SYSTEM = `You are a precise code/document summarization engine inside a provenance-gated knowledge tree. Every claim you emit will be mechanically verified against the cited lines and audited by humans clicking the receipt. Emit only claims the cited lines directly support. Never speculate.`;
+
+const summarizePrompt = (file: string, span: SpanRef): string => {
+  const lines = span.text.split('\n');
+  return `Summarize this ${file.endsWith('.md') ? 'documentation section' : 'source code'} into 3-8 atomic factual claims. Each claim must be one self-contained sentence a reader could verify by reading ONLY the cited lines.
+
+Return ONLY JSON: {"claims":[{"text":"...","startLine":N,"endLine":N}]}
+Rules: cite the NARROWEST line range that supports the claim; startLine/endLine are the absolute line numbers shown; no claim without its lines.
+
+FILE ${file} (lines ${span.startLine}-${span.endLine}):
+${numberedLines(lines, span.startLine)}`;
+};
+
+/** Parse provider output into claim drafts. Tolerates prose-wrapped JSON. Throws on failure. */
+export const parseClaimDrafts = (raw: string): ClaimDraft[] => {
+  const attempt = (s: string): ClaimDraft[] | null => {
+    try {
+      return claimsSchema.parse(JSON.parse(s)).claims;
+    } catch {
+      return null;
+    }
+  };
+  const direct = attempt(raw);
+  if (direct) return direct;
+  const first = raw.indexOf('{');
+  const last = raw.lastIndexOf('}');
+  if (first >= 0 && last > first) {
+    const inner = attempt(raw.slice(first, last + 1));
+    if (inner) return inner;
+  }
+  throw new Error('unparseable claims JSON');
+};
+
+/** Deterministic no-LLM claims: declarations, headings, or an honest content statement.
+ * Supported-by-construction (text is derived mechanically from the cited lines). */
+export const extractiveClaims = (file: string, span: SpanRef, corpus: CorpusSnapshot): Omit<Claim, 'id'>[] => {
+  const lines = span.text.split('\n');
+  const claims: Omit<Claim, 'id'>[] = [];
+  for (let i = 0; i < lines.length && claims.length < 6; i++) {
+    const abs = span.startLine + i;
+    const heading = HEADING_RE.exec(lines[i]);
+    if (heading) {
+      claims.push({
+        text: `Documents "${heading[2].trim()}".`,
+        citations: [{ kind: 'span', span: makeSpan(file, abs, abs, corpus) }],
+        faithfulness: 'supported',
+      });
+      continue;
+    }
+    if (DECL_RE.test(lines[i])) {
+      claims.push({
+        text: `Declares \`${lines[i].trim().replace(/\s*[{(=].*$/u, '').slice(0, 100)}\`.`,
+        citations: [{ kind: 'span', span: makeSpan(file, abs, abs, corpus) }],
+        faithfulness: 'supported',
+      });
+    }
+  }
+  if (claims.length === 0) {
+    const firstLine = lines.find((l) => l.trim().length > 0) ?? '';
+    claims.push({
+      text: `Contains ${lines.length} lines beginning "${firstLine.trim().slice(0, 60)}".`,
+      citations: [{ kind: 'span', span: makeSpan(file, span.startLine, span.endLine, corpus) }],
+      faithfulness: 'supported',
+    });
+  }
+  return claims;
+};
+
+export interface SummarizeResult {
+  claims: Claim[];
+  /** True when any chunk fell back from LLM to extractive. */
+  degraded: boolean;
+}
+
+/** Summarize one file into claims. Provider null = pure extractive. LLM chunks that fail
+ * JSON parsing get ONE stricter retry, then fall back to extractive for that chunk — a
+ * build never dies on a bad response. */
+export const summarizeFile = async (
+  provider: ChatProvider | null,
+  file: string,
+  corpus: CorpusSnapshot,
+  idPrefix: string,
+): Promise<SummarizeResult> => {
+  const entry = corpus.files.get(file);
+  if (!entry) throw new Error(`summarizeFile: ${file} not in corpus`);
+  const spans = chunkFile(file, entry.lines.join('\n'));
+  const out: Omit<Claim, 'id'>[] = [];
+  let degraded = false;
+
+  for (const span of spans) {
+    if (!provider) {
+      out.push(...extractiveClaims(file, span, corpus));
+      continue;
+    }
+    let drafts: ClaimDraft[] | null = null;
+    for (let attempt = 0; attempt < 2 && !drafts; attempt++) {
+      try {
+        const raw = await provider.chat(
+          attempt === 0
+            ? summarizePrompt(file, span)
+            : `${summarizePrompt(file, span)}\n\nYour previous output was not valid JSON. Return ONLY the JSON object, nothing else.`,
+          { json: true, system: SUMMARIZE_SYSTEM },
+        );
+        drafts = parseClaimDrafts(raw);
+      } catch {
+        drafts = null;
+      }
+    }
+    if (!drafts) {
+      degraded = true;
+      out.push(...extractiveClaims(file, span, corpus));
+      continue;
+    }
+    const total = entry.lines.length;
+    for (const d of drafts) {
+      if (d.startLine > total || d.endLine < d.startLine) continue; // hallucinated range: drop
+      out.push({
+        text: d.text.trim(),
+        citations: [{ kind: 'span', span: makeSpan(file, d.startLine, Math.min(d.endLine, total), corpus) }],
+        faithfulness: 'unchecked',
+      });
+    }
+  }
+
+  return {
+    claims: out.map((c, i) => ({ ...c, id: `${idPrefix}#${i}` })),
+    degraded,
+  };
+};

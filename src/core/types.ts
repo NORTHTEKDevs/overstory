@@ -19,11 +19,18 @@ export type Citation =
   | { kind: 'span'; span: SpanRef }
   | { kind: 'claim'; ref: NodeClaimRef };
 
+/** Semantic disclosure tier, set at build time. `supported`: the Reflexion critique
+ * confirmed the cited lines support the claim text. `unsupported`: the critique flagged a
+ * mismatch. `unchecked`: no critique ran (budget-capped or provider failure) — honest
+ * default, never upgraded silently. Extractive claims are supported-by-construction. */
+export type Faithfulness = 'supported' | 'unsupported' | 'unchecked';
+
 export interface Claim {
   id: string;
   text: string;
   citations: Citation[];
   verdict?: Verdict;
+  faithfulness?: Faithfulness;
 }
 
 export interface TreeNode {
@@ -75,6 +82,7 @@ export interface ClaimVerification {
 
 export interface TreeVerification {
   verdicts: Map<string, Verdict>; // claimId -> verdict
+  details: Map<string, ClaimVerification>; // claimId -> full result (incl. heals)
   byNode: Map<string, { verified: number; total: number }>;
   /** Fraction of claims VERIFIED across the whole tree, 0..1. */
   freshness: number;

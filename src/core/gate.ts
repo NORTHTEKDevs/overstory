@@ -112,6 +112,7 @@ export const verifyClaim = (
  * empty tree — nothing claimed, nothing wrong). */
 export const verifyTree = (tree: Tree, corpus: CorpusSnapshot): TreeVerification => {
   const verdicts = new Map<string, Verdict>();
+  const details = new Map<string, ClaimVerification>();
   const byNode = new Map<string, { verified: number; total: number }>();
   let verified = 0;
   let total = 0;
@@ -120,6 +121,7 @@ export const verifyTree = (tree: Tree, corpus: CorpusSnapshot): TreeVerification
     for (const claim of node.claims) {
       const result = verifyClaim(claim, tree, corpus);
       verdicts.set(claim.id, result.verdict);
+      details.set(claim.id, result);
       counts.total += 1;
       total += 1;
       if (result.verdict === 'VERIFIED') {
@@ -129,5 +131,29 @@ export const verifyTree = (tree: Tree, corpus: CorpusSnapshot): TreeVerification
     }
     byNode.set(node.id, counts);
   }
-  return { verdicts, byNode, freshness: total === 0 ? 1 : verified / total };
+  return { verdicts, details, byNode, freshness: total === 0 ? 1 : verified / total };
+};
+
+/** Write verdicts + healed span positions back into a (copied) tree. Healing updates only
+ * line numbers — text and hash are untouched, so the receipt itself never changes. */
+export const applyVerification = (tree: Tree, verification: TreeVerification): Tree => {
+  const nodes: Tree['nodes'] = {};
+  for (const [id, node] of Object.entries(tree.nodes)) {
+    nodes[id] = {
+      ...node,
+      claims: node.claims.map((claim) => {
+        const result = verification.details.get(claim.id);
+        if (!result) return claim;
+        let spanIdx = 0;
+        const citations = claim.citations.map((citation) => {
+          if (citation.kind !== 'span') return citation;
+          const sv = result.spans[spanIdx++];
+          if (!sv?.healed) return citation;
+          return { ...citation, span: { ...citation.span, startLine: sv.healed.startLine, endLine: sv.healed.endLine } };
+        });
+        return { ...claim, citations, verdict: result.verdict };
+      }),
+    };
+  }
+  return { ...tree, nodes };
 };

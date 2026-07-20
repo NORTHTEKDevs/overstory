@@ -1,7 +1,9 @@
 # OVERSTORY — Design Document
 
 Date: 2026-07-19
-Status: DRAFT — pending deep-research reconciliation + adversarial critique (user unreachable; critique panel substitutes for approval per explicit creative-control grant)
+Status: LOCKED (2026-07-19) — deep-research reconciled (docs/research/RESEARCH.md) + Devil's
+Advocate panel verdict PROCEED-WITH-CHANGES, all required changes folded in below (user
+unreachable; critique panel substituted for approval per explicit creative-control grant)
 Author: Claude (autonomous), operating as Kristian's digital twin
 
 ## The idea in one line
@@ -24,9 +26,21 @@ Kristian's research portfolio converges on one invariant, proven three times in 
 
 That null is the key insight: **the tree's value is not retrieval accuracy — it is the
 explorable, provenance-bearing artifact itself.** Nobody has shipped that as a product for
-the corpus every developer owns: their codebase. DeepWiki-class tools (prior knowledge;
-competitive lens verifying) are cloud-hosted and display citations without mechanically
-verifying them. The gap is **private-by-default + receipts-by-construction + honest staleness**.
+the corpus every developer owns: their codebase. The competitive lens (live search,
+2026-07-19) confirmed the gap: DeepWiki (Cognition) shows real line-level citations but they
+are *displayed*, not typed/gated/staleness-checked, it is cloud-hosted, and it has documented
+hallucination incidents (wrong LibreOffice build system; a maintainer's public loss-of-control
+post). Sourcegraph has citation discipline but is a $16k+ enterprise SKU. mutable.ai died.
+"No product combines local/air-gapped deployment + packaged generative Q&A + enforced
+verifiable citation" — the gap is **private-by-default + receipts-by-construction + honest
+staleness**, and it is confirmed, not speculative.
+
+**Business posture (explicit):** this is a moat + adoption play in the GENOME/FACTGATE
+Apache-2.0 pattern, not a direct MRR product. The monetization path (deferred deliberately):
+team features — shared trees, a CI bot that comments when docs go stale, org viewer — behind
+a paid tier once the OSS wedge has distribution. Marketing must never say "fully verified"
+(research risk flag: hallucination detectors cap at ~70-76%); the honest claim is
+"mechanically gated, receipts by construction."
 
 All of Kristian's implementations are Python; the npm-native surface (@northtek/genome-memory)
 is a REST client needing a running server. So OVERSTORY ports the *patterns* natively to
@@ -54,8 +68,17 @@ A's docs mode — same engine, different corpus.
 
 - **Corpus**: files walked from a root (gitignore-aware), each with sha256.
 - **Chunk**: a contiguous span `{file, startLine, endLine, contentHash}`.
-- **Claim**: one atomic statement `{id, text, citations: SpanRef[], verdict}`. Summaries are
-  claim LISTS, not prose blobs — the unit of verification is the claim.
+- **Claim**: one atomic statement `{id, text, citations, verdict, faithfulness}`. Summaries
+  are claim LISTS, not prose blobs — the unit of verification is the claim.
+- **Two disclosure tiers per claim (research directive):** `verdict` = mechanical tier
+  (gate: provenance + freshness, deterministic) and `faithfulness` = semantic tier
+  (`supported` — Reflexion critique confirmed the cited lines support the claim;
+  `unsupported` — critique flagged it; `unchecked` — no critique ran, e.g. budget-capped).
+  Extractive claims are supported-by-construction. Renderers show BOTH tiers; a claim is
+  never presented with more authority than its weaker tier.
+- **Hash-over-text (explicit design line, panel change #3):** `contentHash` hashes the
+  normalized span TEXT, never file+line-position. Line numbers are a hint; verification
+  re-finds moved text and self-heals the line numbers. Edits above a span never stale it.
 - **Node**: `{id, kind: leaf|dir|root, path, claims[], childIds[], contentHash, builtAt,
   freshness}`. Leaves summarize chunks; interior nodes summarize children (citations point at
   child claims, grounding out transitively in source spans).
@@ -94,6 +117,16 @@ statement is one click from its evidence and self-invalidates when the evidence 
 4. **Aggregate upward**: dir -> module -> root, same claim discipline.
 5. **Gate sweep**: every claim verdicted; tree records freshness stats per subtree.
 6. **Index**: BM25 full-text over claims + chunks. (Embeddings deferred post-v1 — YAGNI.)
+
+**Concurrency + checkpoint/resume (panel change #1, measured 2026-07-19):** qwen2.5:14b on
+this machine: 23.7s/summarization call warm, 113.5s cold load, JSON adherence valid on both
+probes. Serial full-repo builds are therefore hours, not minutes. Design: a worker pool with
+provider-declared concurrency (ollama: 1-2 — single GPU queues anyway; anthropic: 4-8),
+per-node checkpointing (each built node written to `.overstory/` immediately), and resume for
+free via the staleness model — `build` IS `refresh` from empty, so a killed build restarts
+where it left off (nodes whose sourceHash still matches are skipped). Progress reporting per
+node with an ETA. Live E2E demos are size-gated: bounded corpus first, full repo only if the
+measured per-node time allows.
 
 ### Query engine (the BSHR port)
 
@@ -145,7 +178,15 @@ UI number. Docs that know when they're lying.
 
 1. `npx tsc --noEmit` clean; full vitest suite green (captured output).
 2. Gate negative controls: fabricated citation -> never VERIFIED; tampered span -> STALE;
-   missing file -> OUT_OF_CORPUS; citation-free claim -> UNGROUNDED. (The FACTGATE ethos test.)
+   missing file -> OUT_OF_CORPUS; citation-free claim -> UNGROUNDED; forged receipt
+   (text/hash mismatch) -> UNGROUNDED; position-shift (edit ABOVE a cited span) -> stays
+   VERIFIED via self-heal, never spuriously STALE. (The FACTGATE ethos test.)
+2b. **Adversarial semantic-mismatch control (panel change #2):** a seeded claim with a
+   syntactically valid, unchanged citation whose TEXT is false (true span, false claim) must
+   exit the Reflexion critique as `faithfulness: unsupported` — never silently presented as
+   fully verified. Mocked-LLM test proves the plumbing; the live-Ollama E2E seeds one real
+   false claim and captures whether qwen2.5:14b catches it (evidence either way, honestly
+   reported).
 3. E2E extractive: fixture repo (~15 files) -> build -> 100% of leaf claims VERIFIED ->
    tamper one file -> refresh -> exactly the right subtree goes STALE -> rebuild -> VERIFIED.
 4. Reflexion: mocked-LLM tests prove revision application + all stop conditions terminate.
