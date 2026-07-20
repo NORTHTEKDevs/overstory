@@ -34,8 +34,13 @@ export interface AskResult {
 }
 
 const subquerySchema = z.object({ subqueries: z.array(z.string().min(2)).min(1).max(4) });
+// refs accepts evidence NUMBERS ([1]-style — reliable for small local models) or raw claim
+// ids (API-grade models); both map back to claim ids before gating.
 const answerSchema = z.object({
-  answer: z.array(z.object({ text: z.string().min(3), refs: z.array(z.string()).min(1) })).min(1).max(12),
+  answer: z
+    .array(z.object({ text: z.string().min(3), refs: z.array(z.union([z.number().int(), z.string()])).min(1) }))
+    .min(1)
+    .max(12),
 });
 
 const ANSWER_SYSTEM = `You answer questions about a codebase using ONLY the verified evidence claims provided. Every sentence must cite the claim ids that support it. If the evidence cannot answer the question, say exactly that in one sentence citing the closest evidence — never fill gaps from general knowledge.`;
@@ -72,17 +77,25 @@ const evidenceFor = (tree: Tree, hits: Array<{ id: string; score: number }>, byI
 /** BSHR over the tree: Brainstorm subqueries -> Search claims (BM25) -> Hypothesize an
  * answer grounded in evidence claim ids -> Refine through the gate (every sentence
  * re-verified transitively; unverifiable sentences quarantined, never blended in). */
+export interface AskPhaseEvent {
+  phase: 'brainstorm' | 'search' | 'write' | 'gate';
+  subqueries?: string[];
+  evidenceCount?: number;
+}
+
 export const ask = async (
   question: string,
   tree: Tree,
   corpus: CorpusSnapshot,
   provider: ChatProvider | null,
-  opts: { k?: number } = {},
+  opts: { k?: number; onPhase?: (e: AskPhaseEvent) => void } = {},
 ): Promise<AskResult> => {
   const k = opts.k ?? 8;
+  const emit = opts.onPhase ?? (() => {});
   const { index, byId } = buildClaimIndex(tree);
 
   // Brainstorm
+  emit({ phase: 'brainstorm' });
   let subqueries = [question];
   if (provider) {
     try {
@@ -98,6 +111,7 @@ export const ask = async (
   }
 
   // Search (dedupe, best score wins)
+  emit({ phase: 'search', subqueries });
   const merged = new Map<string, number>();
   for (const q of subqueries) {
     for (const hit of index.search(q, k)) {
@@ -126,20 +140,28 @@ export const ask = async (
   }
 
   // Hypothesize
-  const evidenceBlock = evidence.map((e) => `[${e.claimId}] (${e.nodePath || 'root'}) ${e.text}`).join('\n');
+  emit({ phase: 'write', evidenceCount: evidence.length });
+  const evidenceBlock = evidence.map((e, i) => `[${i + 1}] (${e.nodePath || 'root'}) ${e.text}`).join('\n');
   const sentences: AnswerSentence[] = [];
   const unverifiable: string[] = [];
+  const refToClaimId = (r: number | string): string | null => {
+    if (typeof r === 'number') return evidence[r - 1]?.claimId ?? null;
+    const numeric = /^\[?(\d{1,2})\]?$/u.exec(r.trim());
+    if (numeric) return evidence[Number(numeric[1]) - 1]?.claimId ?? null;
+    return byId.has(r) ? r : null;
+  };
   try {
     const raw = await provider.chat(
-      `Answer the question using ONLY this evidence. Each answer sentence cites the claim ids that support it.\n\nReturn ONLY JSON: {"answer":[{"text":"...","refs":["<claim id>"]}]}\n\nEVIDENCE:\n${evidenceBlock}\n\nQUESTION: ${question}`,
+      `Answer the question using ONLY this numbered evidence. Every answer sentence cites the evidence numbers that support it.\n\nReturn ONLY JSON: {"answer":[{"text":"one sentence","refs":[1,2]}]}\n\nEVIDENCE:\n${evidenceBlock}\n\nQUESTION: ${question}`,
       { json: true, system: ANSWER_SYSTEM },
     );
     const first = raw.indexOf('{');
     const parsed = answerSchema.parse(JSON.parse(first >= 0 ? raw.slice(first, raw.lastIndexOf('}') + 1) : raw));
 
     // Refine: every sentence goes through the gate transitively.
+    emit({ phase: 'gate' });
     for (const s of parsed.answer) {
-      const validRefs = s.refs.filter((r) => byId.has(r));
+      const validRefs = [...new Set(s.refs.map(refToClaimId).filter((r): r is string => r !== null))];
       if (validRefs.length === 0) {
         unverifiable.push(s.text.trim());
         continue;

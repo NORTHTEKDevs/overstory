@@ -4,6 +4,7 @@ import { loadCorpus } from '../core/corpus.js';
 import { verifyTree } from '../core/gate.js';
 import { loadTree, treePath } from '../core/store.js';
 import { buildClaimIndex } from '../query/ask.js';
+import { notarizeClaims } from '../query/notarize.js';
 import type { CorpusSnapshot, Tree } from '../core/types.js';
 
 const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
@@ -153,32 +154,7 @@ export const createOverstoryServer = (root: string): McpServer => {
       const { tree, corpus } = loaded;
       const verification = verifyTree(tree, corpus);
       const { index, byId } = buildClaimIndex(tree);
-      const results = claims.map((claim) => {
-        if (claim.citations.length === 0) return { text: claim.text, verdict: 'UNGROUNDED' as const, receipts: [], corroboration: null };
-        const receipts: Array<{ file: string; lines: string; text: string } | { missing: string }> = [];
-        let bad = false;
-        for (const c of claim.citations) {
-          const file = corpus.files.get(c.file.replace(/\\/gu, '/'));
-          if (!file || c.startLine > file.lines.length || c.endLine < c.startLine) {
-            receipts.push({ missing: `${c.file}:${c.startLine}-${c.endLine}` });
-            bad = true;
-            continue;
-          }
-          receipts.push({
-            file: c.file,
-            lines: `${c.startLine}-${Math.min(c.endLine, file.lines.length)}`,
-            text: file.lines.slice(c.startLine - 1, Math.min(c.endLine, file.lines.length)).join('\n').slice(0, 800),
-          });
-        }
-        const top = index.search(claim.text, 1)[0];
-        const corroboration =
-          top && verification.verdicts.get(top.id) === 'VERIFIED'
-            ? { claimId: top.id, text: byId.get(top.id)!.claim.text, score: Number(top.score.toFixed(3)) }
-            : null;
-        return { text: claim.text, verdict: bad ? ('OUT_OF_CORPUS' as const) : ('RESOLVED' as const), receipts, corroboration };
-      });
-      const resolved = results.filter((r) => r.verdict === 'RESOLVED').length;
-      return json({ results, summary: { resolved, of: results.length } });
+      return json(notarizeClaims(claims, tree, corpus, verification, index, byId));
     },
   );
 

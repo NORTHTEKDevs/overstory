@@ -67,6 +67,19 @@ describe('ask (BSHR)', () => {
     expect(result.grounding).toBe(1);
   });
 
+  it('numeric evidence refs ([1]-style, small-model friendly) map back to claim ids', async () => {
+    const { tree, corpus } = fixture();
+    const provider = mockProvider((prompt: string) => {
+      if (prompt.includes('"subqueries"')) return '{"subqueries":["add"]}';
+      return '{"answer":[{"text":"add() sums two numbers.","refs":[1]},{"text":"Also string-form works.","refs":["[1]"]}]}';
+    });
+    const result = await ask('what does add do?', tree, corpus, provider);
+    expect(result.sentences).toHaveLength(2);
+    expect(result.sentences[0].verdict).toBe('VERIFIED');
+    expect(result.sentences[1].verdict).toBe('VERIFIED');
+    expect(result.unverifiable).toEqual([]);
+  });
+
   it('llm mode: sentences citing real claims are VERIFIED; fabricated refs are quarantined', async () => {
     const { tree, corpus } = fixture();
     const provider = mockProvider((prompt: string) => {

@@ -5,10 +5,9 @@ import { join, resolve } from 'node:path';
 import { buildTree, verifyExisting } from '../build/builder.js';
 import { loadCorpus } from '../core/corpus.js';
 import { loadTree, treePath } from '../core/store.js';
-import { anthropicProvider } from '../llm/anthropic.js';
-import { ollamaProvider, ollamaReachable } from '../llm/ollama.js';
-import type { ChatProvider } from '../llm/provider.js';
+import { resolveProviders } from '../llm/resolve.js';
 import { runStdioServer } from '../mcp/server.js';
+import { serve } from '../serve/server.js';
 import { ask } from '../query/ask.js';
 import { buildSiteData } from '../site/data.js';
 import { generateSiteHtml } from '../site/generate.js';
@@ -19,9 +18,10 @@ Local-first: nothing leaves this machine.
 
 Usage:
   overstory build  [path]   Build or refresh the tree (resumable; reuses unchanged files)
+  overstory serve  [path]   Open the app: ask your codebase, every answer notarized
   overstory verify [path]   Check every receipt against the current code (exit 1 if any fail)
   overstory ask "question" [path]   Answer from the tree with per-sentence receipts
-  overstory site   [path]   Generate the single-file explorer (.overstory/site.html)
+  overstory site   [path]   Export the shareable single-file explorer
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
 
 Options:
@@ -31,6 +31,7 @@ Options:
   --include <glob>          Only include matching paths (repeatable)
   --max-files <n>           Corpus cap (default 5000)
   --out <file>              Output path for site
+  --port <n>                Port for serve (default 7433)
   --json                    Machine-readable output
 `;
 
@@ -41,6 +42,7 @@ interface Flags {
   include: string[];
   maxFiles?: number;
   out?: string;
+  port?: number;
   json: boolean;
 }
 
@@ -65,6 +67,7 @@ const parseArgs = (argv: string[]): { cmd: string; positional: string[]; flags: 
     else if (a === '--include') flags.include.push(argv[++i] ?? '');
     else if (a === '--max-files') flags.maxFiles = numFlag(argv[++i], '--max-files');
     else if (a === '--out') flags.out = argv[++i];
+    else if (a === '--port') flags.port = numFlag(argv[++i], '--port');
     else if (a === '--help' || a === '-h') positional.push('help');
     else positional.push(a);
   }
@@ -76,24 +79,8 @@ const log = (msg: string): void => {
   process.stderr.write(`${msg}\n`);
 };
 
-const resolveProvider = async (flags: Flags): Promise<{ provider: ChatProvider | null; critic: ChatProvider | null }> => {
-  const wanted = flags.provider;
-  if (wanted === 'none') return { provider: null, critic: null };
-  if (wanted === 'anthropic' || (wanted === 'auto' && process.env.ANTHROPIC_API_KEY)) {
-    const provider = anthropicProvider({ model: flags.model });
-    const critic = anthropicProvider({ model: process.env.OVERSTORY_CRITIC_MODEL ?? 'claude-sonnet-5' });
-    return { provider, critic };
-  }
-  if (wanted === 'ollama' || wanted === 'auto') {
-    if (await ollamaReachable()) {
-      const provider = ollamaProvider({ model: flags.model });
-      return { provider, critic: provider };
-    }
-    if (wanted === 'ollama') throw new Error('Ollama is not reachable at localhost:11434. Start it, or use --provider none.');
-    log('No LLM available (no ANTHROPIC_API_KEY, Ollama unreachable) — building extractive tree. It is deterministic and verified, just less descriptive.');
-  }
-  return { provider: null, critic: null };
-};
+const resolveProvider = (flags: Flags) =>
+  resolveProviders({ provider: flags.provider, model: flags.model, onNotice: log });
 
 const main = async (): Promise<number> => {
   const { cmd, positional, flags } = parseArgs(process.argv.slice(2));
@@ -217,6 +204,32 @@ const main = async (): Promise<number> => {
     const out = flags.out ?? join(root, '.overstory', 'site.html');
     await writeFile(out, html, 'utf8');
     log(`explorer written: ${out} (${(html.length / 1024).toFixed(0)} KB, single file, works offline)`);
+    return 0;
+  }
+
+  if (cmd === 'serve') {
+    const tree = await loadTree(treePath(root));
+    if (!tree) {
+      log('No tree found. Run: overstory build   (then serve)');
+      return 2;
+    }
+    const { provider } = await resolveProvider(flags);
+    await serve(root, {
+      provider,
+      port: flags.port,
+      onReady: (address) => {
+        log(`overstory is up: ${address}`);
+        log('ask your codebase — every answer is notarized against the code');
+        try {
+          // best-effort browser open; the URL above is the contract
+          import('node:child_process').then(({ spawn }) =>
+            spawn(process.platform === 'win32' ? 'cmd' : 'open', process.platform === 'win32' ? ['/c', 'start', '', address] : [address], { detached: true, stdio: 'ignore' }).unref(),
+          );
+        } catch {
+          /* fine — user opens the printed URL */
+        }
+      },
+    });
     return 0;
   }
 

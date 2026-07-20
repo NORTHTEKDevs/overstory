@@ -1,75 +1,80 @@
-# OVERSTORY Design Identity
+# OVERSTORY Design Identity — v2
 
-Date: 2026-07-19  Direction: evidentiary field-ledger (dendrology x notary)
-Rotated away from: Linear-dark neutral-gray console (house default), cream+serif+terracotta and
-acid-green-on-black AI-default clusters (explicitly avoided).
+Date: 2026-07-20  Direction: frontier-lab answer engine (Perplexity/ChatGPT family, receipts inside)
+Rotated away from: v1 dark operator console / field-ledger (client-rejected 2026-07-20 —
+recorded in aesthetic memory; never resurrect for this product).
 
 ## Personality
 
-Three adjectives: field-grade, evidentiary, calm.
-Anti-references (must NOT look like): Docusaurus/Mintlify docs template, DeepWiki wiki chrome,
-AI-slop bento, acid-green hacker terminal, generic shadcn dark dashboard.
-Named references: Linear (operator density + keyboard paths — steal discipline, not palette);
-Stripe docs (receipt-grade clarity of data rows); a botanist's specimen ledger (structure:
-every entry labeled, sealed, and dated).
+Three adjectives: assured, luminous, verifiable.
+Anti-references (must NOT look like): v1's dark ops console; generic shadcn dashboard;
+a literal Perplexity clone (their teal, their exact chrome); Discord-dark developer tools.
+Named references: Perplexity (ask-first composition, phase streaming, source-card rhythm —
+steal the CONFIDENCE of the layout, not the pixels); ChatGPT (conversation column width,
+type comfort, restraint); Anthropic's claude.ai (warmth of the paper surface).
 
 ## The One Decision
 
-**Every claim renders as a receipt**: a ledger row whose verdict is a stamped seal, and whose
-click unfolds the actual cited source lines beneath it — monospace, line-numbered, with the
-content-hash seal and healed-line notation. The provenance interaction IS the identity;
-everything else stays quiet.
+**Citations are stamped receipts.** Where every frontier answer engine shows source cards
+you must take on faith, every OVERSTORY citation chip carries a mechanical verdict seal and
+unfolds INLINE into the exact cited lines with their hash. The trust chip — number + seal +
+one-click receipt — is the identity; everything else stays quiet and frontier-clean.
 
 ## Type system
 
-Display: Fraunces (serif, botanical/apothecary character; graceful fallback Georgia).
-Body: Inter (fallback system-ui).  Mono/data voice: JetBrains Mono (fallback ui-monospace).
-Scale (5): 26/17/14/12.5/11px. Contrast axis: serif display vs sans body; mono is the third
-voice reserved for evidence (source lines, hashes, line numbers, counts).
-The design must remain correct on fallback fonts (air-gapped use is a product promise).
+Display: Fraunces (the ask moment, thread questions, empty-state hero — serif warmth against
+a cool interface; brand continuity with v1).
+Body: Inter (fallback system-ui).  Mono/data voice: JetBrains Mono (receipts, hashes, paths).
+Scale (5): 32 (hero ask) / 22 (thread question) / 15 (body/answers) / 13 (secondary) / 11.5
+(labels, mono chips). Body line-height 1.6. Answer column measure ~68ch max.
 
 ## Palette
 
-Base ramp (spruce-tinted near-black, elevation by lightening, OKLCH-even steps):
-bg0 #0B0F0D, bg1 #101512, bg2 #151C17, bg3 #1B231D, line #243026.
-Text: primary #F2F5F1, secondary #A9B4AA, muted #6C776E.
-Accent (ONE, interaction-only: links, active nav, focus, primary action): #46C0A8
-"glacier lichen" — the forest brand nudged toward Alaskan glacier, never used for verdicts.
-Semantic (verdict-only, never decorative): verified #7FB069 moss, stale #D9A441 lichen amber,
-missing #C4554D iron red, flagged #C4554D (with distinct label), unchecked #8A948B neutral.
-Forbidden: Tailwind default hues verbatim, gradients as hierarchy, pure #000/#FFF.
+Light (default) — paper-warm, not clinical: bg #FAF9F5, surface #FFFFFF, subtle #F1EFE9,
+line #E4E1D8, text #1A1D1B, secondary #5C6660, muted #98A19A.
+Dark — true counterpart, not v1's spruce: bg #101312, surface #171B19, subtle #1D2220,
+line #2A302C, text #F0F2EF, secondary #A3ACA5, muted #6E7770.
+Accent (ONE): #1F7A5C "canopy" — deep evergreen, clearly not Perplexity teal, not ChatGPT
+neutral; hover #196349; on-dark #34A47C. Used for: primary action, active nav, citation
+chips, focus.
+Semantic (verdict-only): verified #1F7A5C shares the canopy hue as a deliberate statement
+(verified IS the brand), stale #B8860B, missing #C0453B, unchecked #98A19A. Never decorative.
+Depth: 1px lines + shadow tokens (0 1px 2px rgba(20,24,22,.06), cards 0 1px 3px .08) in
+light; dark uses surface elevation, no shadows.
 
 ## Layout archetype
 
-Dense operator console, keyboard-first: header (wordmark, freshness meter, search) /
-left tree rail (28px rows, verdict-tinted dots propagate trust state up the tree) /
-main claims ledger (48px collapsed receipt rows). One screen, one job: descend, read, verify.
-Below 720px the rail becomes a toggled drawer.
+Ask-first conversational: slim icon sidebar (new thread, history, library, theme) → single
+centered column (max 760px) — hero ask state, then thread of question/answer turns. Sources
+rail appears inside each answer as a card row (Perplexity rhythm), not a separate pane.
+Library (the knowledge tree) is a secondary full-width view in the same shell.
 
 ## Signature moment
 
-The receipt unfold (see The One Decision). Constraints: <= 220ms ease-out, transform/opacity
-only, `prefers-reduced-motion` renders it instantly open/closed; never animates keyboard
-row-to-row traversal. The freshness number in the header may count up once on load (<= 1s,
-spring per doctrine amendment 2026-07-19, snap-to-final under reduced motion) — a pattern,
-not a second signature.
+The **receipt chip unfold**: numbered chips [1][2] sit inline after answer sentences with a
+tiny verdict seal; hovering lifts the source card; clicking unfolds the exact cited lines +
+sha256 seal in place, 200ms ease-out. Streaming phases (Reading the tree → Searching →
+Writing → Notarizing) are a supporting pattern, executed calmly — never a second signature.
 
 ## Motion identity
 
-Durations: 120ms (hover/focus), 220ms (unfold). Easing: cubic-bezier(0.2, 0, 0, 1) sitewide.
-Signature transition: receipt unfold. Reduced motion: all transitions 0ms, ticker snaps.
+Durations: 120ms (hover/focus), 200ms (unfold/card lift), 300ms (view transitions).
+Easing: cubic-bezier(0.2, 0, 0, 1) sitewide. Streaming text appears in sentence blocks
+(no fake typewriter). Reduced motion: instant everything, phases as plain status lines.
 
 ## Density profile
 
-Operator-dense throughout (tree rail 28px, ledger rows 48px, receipt source 18px line-height
-mono). No marketing airiness anywhere — this is an instrument.
+Editorial-balanced: conversation breathes (ChatGPT comfort), receipts and library lean
+denser (13px, mono details). Never ops-console cramped, never marketing-empty.
 
 ## Copy voice
 
-Plain verbs, sentence case, evidence-first: "Show receipt", "Rebuild needed", "3 of 41 claims
-stale". Empty state teaches the one command to run. Errors name the fix. No mascot talk.
+Calm and precise, sentence case. "Ask about this codebase" not "Ask me anything!".
+Phases in plain words: "Searching 178 claims…", "Notarizing citations…". The gate's honesty
+line stays: "Every citation is checked against the code, not just displayed."
 
 ## Ship gate
 
-Class: product-UI  Threshold: overall >= 8.0, Usability >= 8.0, Creativity >= 6.5, no
-dimension < 6.5 (design-director loop, max 3 cycles, honest score reported if capped).
+Class: product-UI  Threshold: >= 8.0 floor, aspiring 8.5 (client bar: frontier-lab).
+Judged views: home (light+dark), streamed thread with receipts open, library. Max 3 cycles;
+honest score reported if capped.
