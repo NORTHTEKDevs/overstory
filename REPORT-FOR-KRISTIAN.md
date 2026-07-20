@@ -96,5 +96,15 @@ not device screenshots. Anthropic-provider path is mock-tested only (no API key 
   vs the declared "calm", (4) dead space below short claim lists at low-claim nodes,
   (5) `unchecked` chip styling collides with the verdict-chip taxonomy. All are surgical
   post-v1 polish; halted at threshold per loop rules.
-- Final rebuild freshness: PENDING
-- Live semantic probe (qwen catches seeded false claim): PENDING
+- **Final demo build: 100% freshness — 178 of 178 claims VERIFIED** (26 nodes, from-scratch
+  local qwen2.5:14b build, 32 min, `overstory verify` exit 0). 55 leaf claims semantically
+  `supported` by the live critique, 0 `unsupported`, 98 honestly `unchecked` (1-round budget);
+  44 of the 178 claims were ADDED by the critic as missing facts. Artifact: `.overstory/site.html`.
+- **Live semantic probe: PASS, actively** — seeded false claim over real unchanged lines:
+  mechanical gate VERIFIED (correct — the lines exist), live critique flagged it
+  `unsupported`; the paired true claim came back `supported`. This probe also exposed and
+  killed a real bug first (zod `.optional()` rejecting qwen's explicit `null`s had silently
+  disabled the whole critique tier — mocked tests could never catch it; now a captured-shape
+  regression test + a memory lesson).
+- Final state: **83/83 tests green, tsc clean, all commits pushed** to private
+  NORTHTEKDevs/overstory.
