@@ -1,4 +1,34 @@
-# OVERSTORY — Autonomous Build Report (2026-07-19)
+# OVERSTORY — Autonomous Build Report
+
+## v2 addendum (2026-07-20): the frontier-lab app
+
+You rejected the v1 dark operator-console UI and asked for Perplexity/ChatGPT-class product
+quality. Shipped same day, `overstory serve`:
+
+- **Ask-first local app** at http://127.0.0.1:7433 (running now): centered ask hero with
+  grounded suggested questions, SSE-streamed phases ("Searching 178 claims… → Notarizing
+  citations…"), answers with numbered citation chips carrying verdict dots, Perplexity-style
+  receipt cards that unfold inline into the exact cited lines + sha256 + seal, quarantine
+  expander for withheld statements, thread history (persisted to .overstory/threads.json),
+  library view, paper-light + true dark themes, full keyboard path. Zero new dependencies.
+- **Live-bug found & fixed by using it:** qwen cited long claim-IDs sloppily → entire answers
+  quarantined. Fix: numbered evidence refs ([1]-style, the Perplexity approach) with
+  server-side mapping — first live ask after the fix: real answer, 5/5 receipts, Grounded 100%.
+- **Design gate v2:** 3-judge panel average **8.37 PASS** (A 8.36 / B 7.90 / C 8.85); all of
+  both judges' consensus fixes applied and screenshot-verified after (chip affordance at
+  rest, colorblind ✓ on verified seals, calm sidebar voice, dead-space fixes on all three
+  views, path truncation, status-legend). Consciously accepted finding, recorded not hidden:
+  the shell's structural anatomy is deliberately in Perplexity's family — you asked for
+  exactly that; the receipt mechanism is the differentiation. Structural departure ("trust
+  strip" resting mode for receipts) is the top v3 candidate.
+- Static export restyled to the same v2 system (paper-light + dark via prefers-color-scheme).
+- **91/91 tests green** incl. a full serve-stack suite (SSE streaming, threads, notarize API,
+  malformed-body resilience). Your taste verdict is in memory so no future session ships
+  ops-console aesthetics for an AI answer product again.
+
+---
+
+# v1 report (2026-07-19)
 
 You said: analyze the setup, blend BSHR / Reflexion / RAPTOR / knowledge trees / your research,
 create a brand-new product as your digital twin, deep-research the field, full creative

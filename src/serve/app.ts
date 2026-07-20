@@ -73,7 +73,8 @@ textarea { font:inherit; color:inherit; }
 
 /* ---------- main ---------- */
 .main { overflow-y:auto; min-width:0; display:flex; flex-direction:column; }
-.view { width:100%; }
+.view { width:100%; flex:1; display:flex; flex-direction:column; }
+.view > * { flex:1; }
 
 /* home */
 .home { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 24px; gap:0; min-height:100%; }
@@ -98,7 +99,8 @@ textarea { font:inherit; color:inherit; }
 .honesty { margin-top:40px; font-size:12px; color:var(--text3); text-align:center; max-width:480px; }
 
 /* thread */
-.thread-view { max-width:800px; width:100%; margin:0 auto; padding:36px 32px 140px; }
+.thread-view { max-width:800px; width:100%; margin:0 auto; padding:36px 32px 24px; display:flex; flex-direction:column; }
+.turns { flex:1; }
 .turn { padding:18px 0 30px; }
 .turn + .turn { border-top:1px solid var(--line); }
 .turn .q { font:450 22px/1.35 var(--serif); letter-spacing:-.005em; margin-bottom:14px; }
@@ -109,7 +111,7 @@ textarea { font:inherit; color:inherit; }
 @keyframes pulse { 0%,100% { opacity:.25; transform:scale(.85);} 50% { opacity:1; transform:scale(1);} }
 .answer { font-size:15px; line-height:1.7; max-width:68ch; }
 .answer .sent { display:inline; }
-.chip { display:inline-flex; align-items:center; gap:3px; vertical-align:2px; margin:0 3px 0 2px; padding:1px 7px; border-radius:999px; font:500 10.5px var(--mono); border:1px solid var(--line); color:var(--text2); background:var(--surface); transition:all 120ms var(--ease); }
+.chip { display:inline-flex; align-items:center; gap:3px; vertical-align:2px; margin:0 3px 0 2px; padding:1px 7px; border-radius:999px; font:500 10.5px var(--mono); border:1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); color:var(--accent); background:var(--surface); transition:all 120ms var(--ease); }
 .chip .seal-dot { width:5px; height:5px; border-radius:50%; }
 .chip:hover { border-color:var(--accent); color:var(--accent); }
 .chip.open { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
@@ -125,11 +127,14 @@ textarea { font:inherit; color:inherit; }
 .card .c-top { display:flex; align-items:center; gap:7px; min-width:0; }
 .card .c-n { flex:none; font:500 10px var(--mono); color:var(--text3); border:1px solid var(--line); border-radius:5px; padding:1px 5px; }
 .card .c-file { font:500 12.5px var(--sans); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.card .c-meta { display:flex; align-items:center; gap:8px; font:400 10.5px var(--mono); color:var(--text3); }
+.card .c-meta { display:flex; align-items:center; gap:8px; font:400 10.5px var(--mono); color:var(--text3); min-width:0; }
+.card .c-meta .c-path { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .card .c-snip { font:400 11px/1.5 var(--mono); color:var(--text2); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
 .seal { display:inline-flex; align-items:center; gap:4px; font:500 10px var(--mono); }
 .seal .s-dot { width:6px; height:6px; border-radius:50%; }
 .seal.VERIFIED { color:var(--verified); } .seal.VERIFIED .s-dot { background:var(--verified); }
+.seal.VERIFIED .s-dot::after { content:"\\2713"; color:#fff; font-size:5px; line-height:6px; display:block; text-align:center; }
+.seal .s-dot { position:relative; }
 .seal.STALE { color:var(--stale); } .seal.STALE .s-dot { background:var(--stale); }
 .seal.OUT_OF_CORPUS, .seal.UNGROUNDED { color:var(--missing); } .seal.OUT_OF_CORPUS .s-dot, .seal.UNGROUNDED .s-dot { background:var(--missing); }
 .receipt { margin-top:10px; background:var(--surface); border:1px solid var(--line); border-radius:11px; overflow:hidden; box-shadow:var(--shadow-sm); }
@@ -270,10 +275,14 @@ textarea { font:inherit; color:inherit; }
     pill.classList.toggle('warn', pct < 100);
     document.getElementById('freshPct').textContent = pct + '%';
     document.getElementById('freshLabel').textContent = pct === 100
-      ? o.total + ' claims verified'
-      : (o.total - o.verified) + ' of ' + o.total + ' need attention';
-    pill.title = 'Built ' + new Date(o.builtAt).toLocaleString() + ' — run overstory build to refresh';
-    document.getElementById('providerTag').textContent = o.provider;
+      ? 'tree is current'
+      : (o.total - o.verified) + ' claims out of date';
+    pill.title = 'Built ' + new Date(o.builtAt).toLocaleString() + ' \\u00B7 ' + o.verified + ' of ' + o.total + ' claims verified \\u00B7 run overstory build to refresh';
+    var prov = o.provider || '';
+    var pretty = prov.indexOf('ollama:') === 0 ? 'Local model \\u00B7 ' + prov.slice(7)
+      : prov.indexOf('anthropic:') === 0 ? 'Anthropic \\u00B7 ' + prov.slice(10)
+      : 'No LLM \\u00B7 evidence only';
+    document.getElementById('providerTag').textContent = pretty;
   }
 
   function renderThreadList() {
@@ -445,9 +454,11 @@ textarea { font:inherit; color:inherit; }
 
   function renderThread() {
     var wrap = el('div', 'thread-view');
+    var turns = el('div', 'turns');
     state.thread.turns.forEach(function (turn, i) {
-      wrap.appendChild(renderTurn(turn, i === state.thread.turns.length - 1));
+      turns.appendChild(renderTurn(turn, i === state.thread.turns.length - 1));
     });
+    wrap.appendChild(turns);
     var fu = el('div', 'followup');
     fu.appendChild(askBox('Ask a follow-up\\u2026', !state.streaming));
     wrap.appendChild(fu);
@@ -546,7 +557,11 @@ textarea { font:inherit; color:inherit; }
         seal.appendChild(document.createTextNode(SEAL_WORD[ev.verdict] || 'verified'));
         seal.title = SEAL_TITLE[ev.verdict] || '';
         meta.appendChild(seal);
-        if (ev.spans && ev.spans[0]) meta.appendChild(el('span', '', ev.spans[0].file + ':' + ev.spans[0].startLine + '-' + ev.spans[0].endLine));
+        if (ev.spans && ev.spans[0]) {
+          var pathEl = el('span', 'c-path', ev.spans[0].file + ':' + ev.spans[0].startLine + '-' + ev.spans[0].endLine);
+          pathEl.title = ev.spans[0].file + ':' + ev.spans[0].startLine + '-' + ev.spans[0].endLine;
+          meta.appendChild(pathEl);
+        }
         card.appendChild(meta);
         card.appendChild(el('div', 'c-snip', ev.text));
         card.addEventListener('click', function () { toggleReceiptCard(t, ref, card); });
@@ -620,7 +635,9 @@ textarea { font:inherit; color:inherit; }
         if (d.error) return;
         state.treeData = d;
         state.libNode = state.libNode || d.root;
-        state.libOpen[d.root] = true;
+        Object.keys(d.nodes).forEach(function (id) {
+          if (d.nodes[id].kind !== 'leaf') state.libOpen[id] = true; // populated by default, never two lonely rows
+        });
         render();
       });
       main.appendChild(el('div', 'empty', 'Loading the tree\\u2026'));
@@ -637,7 +654,8 @@ textarea { font:inherit; color:inherit; }
     banner.appendChild(bp);
     banner.appendChild(document.createTextNode(
       (pct === 100 ? 'Every claim verified against the code' : (d.total - d.verified) + ' of ' + d.total + ' claims need attention') +
-      ' \\u00B7 built ' + new Date(d.builtAt).toLocaleString()
+      ' \\u00B7 built ' + new Date(d.builtAt).toLocaleString() +
+      ' \\u00B7 verified = receipt checked \\u00B7 unchecked = awaiting semantic critique'
     ));
     main.appendChild(banner);
     main.appendChild(el('h2', 'node-h', node.kind === 'root' ? node.title : node.title));

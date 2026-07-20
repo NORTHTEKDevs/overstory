@@ -19,21 +19,29 @@ export const generateSiteHtml = (data: SiteData): string => {
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg0:#0B0F0D; --bg1:#101512; --bg2:#151C17; --bg3:#1B231D; --line:#243026;
-  --text:#F2F5F1; --text2:#A9B4AA; --text3:#6C776E;
-  --accent:#46C0A8;
-  --verified:#7FB069; --stale:#D9A441; --missing:#C4554D; --unchecked:#8A948B;
+  --bg0:#FAF9F5; --bg1:#FFFFFF; --bg2:#F1EFE9; --bg3:#E9E6DD; --line:#E4E1D8;
+  --text:#1A1D1B; --text2:#5C6660; --text3:#98A19A;
+  --accent:#1F7A5C;
+  --verified:#1F7A5C; --stale:#B8860B; --missing:#C0453B; --unchecked:#98A19A;
   --serif:"Fraunces",Georgia,"Iowan Old Style",serif;
   --sans:"Inter",system-ui,-apple-system,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
   --ease:cubic-bezier(0.2,0,0,1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg0:#101312; --bg1:#171B19; --bg2:#1D2220; --bg3:#242A26; --line:#2A302C;
+    --text:#F0F2EF; --text2:#A3ACA5; --text3:#6E7770;
+    --accent:#34A47C;
+    --verified:#34A47C; --stale:#D9A441; --missing:#D06258; --unchecked:#6E7770;
+  }
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 html { height:100%; }
 body { height:100%; background:var(--bg0); color:var(--text); font:400 14px/1.5 var(--sans); }
 button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
 :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
-::selection { background:rgba(70,192,168,.25); }
+::selection { background:color-mix(in srgb, var(--accent) 22%, transparent); }
 
 .app { display:grid; grid-template-rows:56px 1fr; height:100%; max-width:1600px; margin:0 auto; }
 .frame { display:grid; grid-template-columns:300px 1fr; min-height:0; border-top:1px solid var(--line); }
@@ -86,9 +94,9 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:point
 .claim-row:hover { background:var(--bg2); }
 .claim-row[aria-expanded="true"] { background:var(--bg2); }
 .seal { flex:none; margin-top:1px; display:inline-flex; align-items:center; gap:5px; font:500 10.5px var(--mono); letter-spacing:.05em; padding:2px 8px; border-radius:999px; border:1px solid; }
-.seal.VERIFIED { color:var(--verified); border-color:rgba(127,176,105,.4); background:rgba(127,176,105,.08); }
-.seal.STALE { color:var(--stale); border-color:rgba(217,164,65,.4); background:rgba(217,164,65,.08); }
-.seal.OUT_OF_CORPUS, .seal.UNGROUNDED { color:var(--missing); border-color:rgba(196,85,77,.4); background:rgba(196,85,77,.08); }
+.seal.VERIFIED { color:var(--verified); border-color:color-mix(in srgb, var(--verified) 40%, transparent); background:color-mix(in srgb, var(--verified) 9%, transparent); }
+.seal.STALE { color:var(--stale); border-color:color-mix(in srgb, var(--stale) 40%, transparent); background:color-mix(in srgb, var(--stale) 9%, transparent); }
+.seal.OUT_OF_CORPUS, .seal.UNGROUNDED { color:var(--missing); border-color:color-mix(in srgb, var(--missing) 40%, transparent); background:color-mix(in srgb, var(--missing) 9%, transparent); }
 .claim-text { flex:1; min-width:0; font-size:14px; color:var(--text); overflow-wrap:anywhere; }
 .flag { flex:none; font:400 10.5px var(--mono); color:var(--missing); border:1px dashed rgba(196,85,77,.5); padding:1px 6px; border-radius:4px; margin-top:2px; }
 .flag.unchecked { color:var(--unchecked); border-color:rgba(138,148,139,.4); }
@@ -136,10 +144,10 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:point
     <button class="rail-toggle" id="railToggle" aria-label="Toggle tree">tree</button>
     <div class="mark" aria-hidden="true">
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <circle cx="11" cy="8" r="5.2" stroke="#46C0A8" stroke-width="1.4"/>
-        <circle cx="6.6" cy="11.4" r="4" stroke="#7FB069" stroke-width="1.2" opacity=".7"/>
-        <circle cx="15.4" cy="11.4" r="4" stroke="#A9B4AA" stroke-width="1.2" opacity=".45"/>
-        <path d="M11 13v6" stroke="#6C776E" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="11" cy="8" r="5.2" stroke="var(--accent)" stroke-width="1.4"/>
+        <circle cx="6.6" cy="11.4" r="4" stroke="var(--text3)" stroke-width="1.2" opacity=".8"/>
+        <circle cx="15.4" cy="11.4" r="4" stroke="var(--text3)" stroke-width="1.2" opacity=".5"/>
+        <path d="M11 13v6" stroke="var(--text3)" stroke-width="1.4" stroke-linecap="round"/>
       </svg>
     </div>
     <span class="wordmark">OVERSTORY</span>

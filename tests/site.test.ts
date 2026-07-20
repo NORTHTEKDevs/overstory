@@ -50,9 +50,10 @@ describe('generateSiteHtml', () => {
     expect(JSON.stringify(leaf)).toContain('alert(1)');
   });
 
-  it('carries the DESIGN.md identity tokens', () => {
-    expect(html).toContain('#46C0A8'); // glacier lichen accent
-    expect(html).toContain('#0B0F0D'); // spruce-black base
+  it('carries the DESIGN.md v2 identity tokens', () => {
+    expect(html).toContain('#1F7A5C'); // canopy accent
+    expect(html).toContain('#FAF9F5'); // paper-light base
+    expect(html).toContain('prefers-color-scheme: dark'); // dual theme
     expect(html).toContain('Fraunces'); // display voice
     expect(html).toContain('JetBrains Mono'); // evidence voice
     expect(html).toContain('prefers-reduced-motion');

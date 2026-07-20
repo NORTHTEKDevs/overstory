@@ -15,11 +15,16 @@ summarization). The gate itself is always local.
 
 ```
 npx @northtek/overstory build     # build the tree (resumable; reuses unchanged files)
-npx @northtek/overstory site      # single-file explorer -> .overstory/site.html
-npx @northtek/overstory ask "how does auth work?"
+npx @northtek/overstory serve     # open the app: ask your codebase, answers notarized
 npx @northtek/overstory verify    # CI-friendly: exit 1 if any receipt fails
 npx @northtek/overstory mcp       # MCP tools for Claude Code / Cursor
+npx @northtek/overstory site      # shareable single-file explorer
 ```
+
+**The app** (`overstory serve`) is a local, frontier-lab-grade answer engine over your repo:
+ask-first home, streamed phases (searching → writing → notarizing), answers with numbered
+citation chips, and receipt cards that unfold into the exact cited lines with their hash and
+verdict seal. Threads persist locally; light and dark themes; nothing leaves your machine.
 
 ## Why
 
