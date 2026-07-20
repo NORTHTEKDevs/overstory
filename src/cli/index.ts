@@ -186,7 +186,7 @@ const main = async (): Promise<number> => {
       return 2;
     }
     const { provider } = await resolveProvider(flags);
-    const corpus = await loadCorpus(root);
+    const corpus = await loadCorpus(root, tree.corpusOptions ?? {});
     const result = await ask(question, tree, corpus, provider);
     if (flags.json) {
       process.stdout.write(JSON.stringify(result) + '\n');
@@ -211,7 +211,7 @@ const main = async (): Promise<number> => {
       log('No tree found. Run: overstory build');
       return 2;
     }
-    const corpus = await loadCorpus(root);
+    const corpus = await loadCorpus(root, tree.corpusOptions ?? {});
     const verification = verifyTree(tree, corpus);
     const html = generateSiteHtml(buildSiteData(tree, verification));
     const out = flags.out ?? join(root, '.overstory', 'site.html');
