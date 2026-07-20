@@ -5,3 +5,7 @@ dist/
 .env
 .env.*
 build-progress.log
+final-build.json
+final-build.log
+fresh-build.json
+fresh-build.log
