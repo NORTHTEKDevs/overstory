@@ -4,19 +4,22 @@ import type { Claim, CorpusSnapshot } from '../core/types.js';
 import type { ChatProvider } from '../llm/provider.js';
 import { numberedLines } from './summarize.js';
 
+// Local models emit `null` and empty strings for omitted fields — nullish(), never
+// optional()-only, or the whole critique silently dies at the parse (live-verified failure
+// mode: qwen2.5:14b returns "revisedStartLine": null on SUPPORTED claims).
 const critiqueSchema = z.object({
   claims: z.array(
     z.object({
       id: z.string(),
       verdict: z.enum(['SUPPORTED', 'UNSUPPORTED']),
-      revisedText: z.string().optional(),
-      revisedStartLine: z.number().int().min(1).optional(),
-      revisedEndLine: z.number().int().min(1).optional(),
+      revisedText: z.string().nullish(),
+      revisedStartLine: z.number().int().min(1).nullish(),
+      revisedEndLine: z.number().int().min(1).nullish(),
     }),
   ),
   missing: z
-    .array(z.object({ text: z.string().min(3), startLine: z.number().int().min(1), endLine: z.number().int().min(1) }))
-    .optional(),
+    .array(z.object({ text: z.string().nullish(), startLine: z.number().int().min(1).nullish(), endLine: z.number().int().min(1).nullish() }))
+    .nullish(),
 });
 
 const CRITIQUE_SYSTEM = `You are an adversarial fact-checker for a provenance-gated knowledge tree. Your job is to REFUTE claims: a claim is SUPPORTED only if a skeptical reader would agree the cited lines directly state or straightforwardly imply it. Judge only against the cited lines shown — not general knowledge. Flag overreach, speculation, and misattribution. Do not reward fluent wording.`;
@@ -75,18 +78,23 @@ export const refineClaims = async (
     const targets = working.filter((c) => c.faithfulness !== 'supported');
     if (targets.length === 0) return { claims: working, rounds, stop: 'converged' };
 
-    let parsed: z.infer<typeof critiqueSchema>;
-    try {
-      const raw = await provider.chat(critiquePrompt(file, entry.lines, targets), {
-        json: true,
-        system: CRITIQUE_SYSTEM,
-      });
-      const first = raw.indexOf('{');
-      const last = raw.lastIndexOf('}');
-      parsed = critiqueSchema.parse(JSON.parse(first >= 0 ? raw.slice(first, last + 1) : raw));
-    } catch {
-      return { claims: working, rounds, stop: 'critique-failed' };
+    let parsed: z.infer<typeof critiqueSchema> | null = null;
+    for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+      try {
+        const raw = await provider.chat(
+          attempt === 0
+            ? critiquePrompt(file, entry.lines, targets)
+            : `${critiquePrompt(file, entry.lines, targets)}\n\nYour previous output was not valid JSON for the requested shape. Return ONLY the JSON object.`,
+          { json: true, system: CRITIQUE_SYSTEM },
+        );
+        const first = raw.indexOf('{');
+        const last = raw.lastIndexOf('}');
+        parsed = critiqueSchema.parse(JSON.parse(first >= 0 ? raw.slice(first, last + 1) : raw));
+      } catch {
+        parsed = null;
+      }
     }
+    if (!parsed) return { claims: working, rounds, stop: 'critique-failed' };
     rounds += 1;
 
     const byId = new Map(parsed.claims.map((v) => [v.id, v]));
@@ -95,10 +103,11 @@ export const refineClaims = async (
       const v = byId.get(c.id);
       if (!v || c.faithfulness === 'supported') return c;
       if (v.verdict === 'SUPPORTED') return { ...c, faithfulness: 'supported' as const };
-      if (v.revisedText && v.revisedStartLine && v.revisedEndLine && v.revisedStartLine <= total) {
+      const revised = v.revisedText?.trim();
+      if (revised && revised.length >= 3 && v.revisedStartLine && v.revisedEndLine && v.revisedStartLine <= total) {
         return {
           ...c,
-          text: v.revisedText.trim(),
+          text: revised,
           citations: [
             { kind: 'span' as const, span: makeSpan(file, v.revisedStartLine, Math.min(v.revisedEndLine, total), corpus) },
           ],
@@ -109,11 +118,14 @@ export const refineClaims = async (
     });
 
     for (const m of parsed.missing ?? []) {
-      if (m.startLine > total) continue;
+      const text = m.text?.trim();
+      if (!text || text.length < 3 || !m.startLine || !m.endLine || m.startLine > total) continue;
+      const span = makeSpan(file, m.startLine, Math.min(m.endLine, total), corpus);
+      if (span.text.trim().length === 0) continue; // a blank line grounds nothing
       working.push({
         id: `${claims[0].id.split('#')[0]}#m${working.length}`,
-        text: m.text.trim(),
-        citations: [{ kind: 'span', span: makeSpan(file, m.startLine, Math.min(m.endLine, total), corpus) }],
+        text,
+        citations: [{ kind: 'span', span }],
         faithfulness: 'unchecked',
       });
     }

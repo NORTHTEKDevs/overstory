@@ -98,6 +98,17 @@ describe('summarizeFile', () => {
     expect(degraded).toBe(false); // one valid claim survived — not a degraded chunk
   });
 
+  it('drops drafts citing blank lines (a claim that can never verify is not stored)', async () => {
+    const corpus = corpusOf({ 'src/a.ts': FILE });
+    // line 4 of FILE is empty
+    const provider = mockProvider([
+      '{"claims":[{"text":"real claim","startLine":1,"endLine":2},{"text":"cites a blank line","startLine":4,"endLine":4}]}',
+    ]);
+    const { claims } = await summarizeFile(provider, 'src/a.ts', corpus, 'p');
+    expect(claims).toHaveLength(1);
+    expect(claims[0].text).toBe('real claim');
+  });
+
   it('flags degraded + falls back to extractive when EVERY draft has a hallucinated range', async () => {
     const corpus = corpusOf({ 'src/a.ts': FILE });
     const provider = mockProvider([

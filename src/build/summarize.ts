@@ -140,9 +140,11 @@ export const summarizeFile = async (
     const before = out.length;
     for (const d of drafts) {
       if (d.startLine > total || d.endLine < d.startLine) continue; // hallucinated range: drop
+      const span = makeSpan(file, d.startLine, Math.min(d.endLine, total), corpus);
+      if (span.text.trim().length === 0) continue; // cites a blank line: can never verify, drop now
       out.push({
         text: d.text.trim(),
-        citations: [{ kind: 'span', span: makeSpan(file, d.startLine, Math.min(d.endLine, total), corpus) }],
+        citations: [{ kind: 'span', span }],
         faithfulness: 'unchecked',
       });
     }

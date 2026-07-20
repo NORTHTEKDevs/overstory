@@ -70,6 +70,34 @@ describe('refineClaims (Reflexion)', () => {
     expect(result.stop).toBe('max-rounds'); // budget spent with an unchecked claim left — honest
   });
 
+  it('LIVE-VERIFIED REGRESSION: local models emit null/empty for omitted fields — must parse, not silently kill the critique tier', async () => {
+    const corpus = corpusOf({ 'src/a.ts': FILE });
+    const claim = seedClaim(corpus, 'add() returns the sum of a and b');
+    // Exact shape captured from qwen2.5:14b live on 2026-07-19.
+    const critic = mockProvider([
+      JSON.stringify({
+        claims: [{ id: 'leaf:src/a.ts#0', verdict: 'SUPPORTED', revisedText: '', revisedStartLine: null, revisedEndLine: null }],
+        missing: [{ text: null, startLine: 1, endLine: 1 }],
+      }),
+    ]);
+    const result = await refineClaims(critic, 'src/a.ts', [claim], corpus);
+    expect(result.stop).toBe('converged');
+    expect(result.claims).toHaveLength(1); // null-text missing entry filtered, not crashed on
+    expect(result.claims[0].faithfulness).toBe('supported');
+  });
+
+  it('retries once on unparseable critique output before degrading honestly', async () => {
+    const corpus = corpusOf({ 'src/a.ts': FILE });
+    const claim = seedClaim(corpus, 'add() returns the sum of a and b');
+    const critic = mockProvider([
+      'not json at all',
+      '{"claims":[{"id":"leaf:src/a.ts#0","verdict":"SUPPORTED"}]}',
+    ]);
+    const result = await refineClaims(critic, 'src/a.ts', [claim], corpus);
+    expect(critic.prompts).toHaveLength(2);
+    expect(result.claims[0].faithfulness).toBe('supported');
+  });
+
   it('critique failure leaves faithfulness unchecked (honest, never upgraded)', async () => {
     const corpus = corpusOf({ 'src/a.ts': FILE });
     const claim = seedClaim(corpus, 'add() returns the sum of a and b');

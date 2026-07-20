@@ -1,0 +1,100 @@
+# OVERSTORY — Autonomous Build Report (2026-07-19)
+
+You said: analyze the setup, blend BSHR / Reflexion / RAPTOR / knowledge trees / your research,
+create a brand-new product as your digital twin, deep-research the field, full creative
+control, ~8.5 hours. This is what happened. Everything below is evidence-backed; where
+something is unverified I say so.
+
+## What got built
+
+**OVERSTORY** (`~/projects/active/overstory`, private repo `NORTHTEKDevs/overstory`):
+a knowledge tree of any codebase or docs folder where **every claim carries a mechanically
+verifiable receipt** — local-first, zero-infra, `npx`-able. It is the TypeScript synthesis of
+your whole research line: FACTGATE's fail-closed gate (VERIFIED / STALE / OUT_OF_CORPUS /
+UNGROUNDED), verified-memory's invariant (context in, adjudicated claims out), GENOME's RAPTOR
+build — including its honest null: the tree's value is the explorable provenance artifact, not
+retrieval accuracy — RAIN's Reflexion mechanics, and BSHR as the query engine.
+
+Surfaces: CLI (`build/verify/ask/site/mcp`), an MCP server whose star tool `overstory_verify`
+notarizes the HOST agent's own answers (Claude Code drafts, OVERSTORY checks the receipts —
+zero API keys needed), and a single-file award-tier explorer where claims unfold into
+receipts (source lines + sha256 seal). Staleness is structural: hashes over span TEXT (edits
+above a span self-heal), `overstory verify` exits non-zero in CI when docs and code disagree.
+
+## Why this product (the twin call)
+
+Deep research (docs/research/RESEARCH.md, all cited) confirmed the gap is real and unclaimed:
+"no product combines local/air-gapped deployment + packaged generative Q&A + enforced
+verifiable citation." DeepWiki is cloud-only with documented hallucination incidents;
+Sourcegraph's citation UI is a $16k enterprise SKU; mutable.ai died. Devil's Advocate panel
+verdict on the design: PROCEED-WITH-CHANGES (all changes implemented: build concurrency +
+checkpoint/resume, the adversarial semantic-mismatch control, hash-over-text made explicit).
+Business posture: moat + adoption play in your GENOME/FACTGATE Apache-2.0 pattern; monetization
+path documented (team trees, stale-docs CI bot) and deliberately deferred.
+
+## Evidence (all executed this session)
+
+- Tests: **80/80 green** (`npx vitest run`), `tsc --noEmit` clean, dist builds, `npm pack`
+  clean (44 KB, 47 files).
+- Gate negative controls PASS: fabricated citation never VERIFIED; tampered span -> STALE;
+  forged receipt (hash/text mismatch) -> UNGROUNDED; edit-above-span heals instead of staling;
+  duplicate citations verify (not spuriously downgraded); cycles fail closed.
+- Adversarial semantic-mismatch control PASS (mocked): true span + false claim exits
+  `faithfulness: unsupported`, kept visible and flagged, never silently VERIFIED.
+- Live E2E on OVERSTORY itself with local qwen2.5:14b (measured first: 23.7s/call warm,
+  113.5s cold, JSON adherence valid): first full build 26 nodes / 136 claims / 29.3 min.
+- The staleness system caught ME twice, unprompted: editing source after a build flipped the
+  explorer to amber "N of M claims need attention" both times. The honest-freshness pitch
+  demonstrated itself.
+- Ship-gate workflow (5 reviewers + adversarial verify): **BLOCK verdict with 7 must-fix
+  findings — all 7 fixed + regression-tested same session** (build lock, checkpoint-failure
+  surfacing, corpusOptions persistence so MCP/CLI verify against the built scope, path-scoped
+  cycle detection, NaN-proof flags, prototype-pollution guards, README local-first wording).
+- Design: DESIGN.md written before UI code (evidentiary field-ledger identity; receipt-unfold
+  signature). Rendered-screenshot critique loop ran; cycle-1 usability-floor miss fixed
+  (receipt affordances, section-wide receipts, roll-up de-chaining, lockfile exclusion).
+  Final 3-judge panel score: see FINAL NUMBERS below.
+
+## Decisions I made without you (flagging per protocol)
+
+1. Applied the pending design-intel doctrine proposal (springs for number tickers, guardrailed) —
+   it was two-source evidenced and consistent with your accepted patterns. Queue is empty.
+2. Created `NORTHTEKDevs/overstory` as **PRIVATE** and pushed (your always-push rule) — making
+   it public is your call, it is one click.
+3. Northtek commit identity, no Claude trailer (your public-repo rule), Apache-2.0.
+4. Cut `claude -p` as an LLM provider (untested-on-this-machine code = dishonest to ship);
+   documented in roadmap instead.
+5. Used Workflow orchestration in-session instead of night-shift (your machine-limits feedback).
+6. Brainstorming/design approvals: user-unreachable, so the Devil's Advocate panel + ship-gate +
+   judge panel substituted for your approval gates, per your explicit creative-control grant.
+
+## What needs YOU
+
+1. **Flip the repo public** when you're happy (`gh repo edit NORTHTEKDevs/overstory --visibility public`).
+2. **npm publish** needs your passkey (non-delegable): `cd ~/projects/active/overstory && npm publish --access public`
+   (prepack builds dist; do NOT use --ignore-scripts).
+3. Skim REPORT + README + the explorer (`.overstory/site.html`) — the demo artifact is the pitch.
+4. Optional launch moves: post the "docs that know when they're lying" angle; the
+   staleness-catches-me-live story writes itself.
+
+## Honest limitations (v1, documented in README/roadmap)
+
+Interior-node claims are not critique-checked (marked `unchecked` — honest, visible); heal
+anchors to first byte-identical occurrence (deliberate: identical text = identical evidence);
+extractive mode's claims are shallow ("Declares X") by design; local-model builds are slow
+(~90s/file with critique on this machine); mobile rendering verified by CSS defensiveness,
+not device screenshots. Anthropic-provider path is mock-tested only (no API key on this box).
+
+## FINAL NUMBERS
+
+- **Design ship gate: PASS at 8.12 / 10** (threshold 8.0, product-UI class). Panel of 3
+  independent judges: 8.86 / 7.20 / 8.31; all floors met (Usability 8.34, Creativity 8.17).
+  Spread 1.66 logged — the disagreement axis: whether the resting ledger rows carry the
+  field-ledger identity or only the unfolded receipt does. Remaining gaps recorded, not hidden:
+  (1) wrapped claim rows break the declared 48px rhythm (line-clamp fix), (2) resting rows
+  could carry a receipt cue (mono hash sliver), (3) the amber freshness stat reads alarm-weight
+  vs the declared "calm", (4) dead space below short claim lists at low-claim nodes,
+  (5) `unchecked` chip styling collides with the verdict-chip taxonomy. All are surgical
+  post-v1 polish; halted at threshold per loop rules.
+- Final rebuild freshness: PENDING
+- Live semantic probe (qwen catches seeded false claim): PENDING

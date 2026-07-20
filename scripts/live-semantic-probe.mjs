@@ -46,4 +46,4 @@ for (const c of result.claims) {
 const probe0 = result.claims.find((c) => c.id === 'probe#0');
 const falseClaimSurvived = probe0 && probe0.faithfulness === 'supported' && probe0.text === falseClaim.text;
 console.log(`\nVERDICT: ${falseClaimSurvived ? 'FAIL - false claim passed critique unchanged' : 'PASS - false claim did not survive as supported'}`);
-process.exit(falseClaimSurvived ? 1 : 0);
+process.exitCode = falseClaimSurvived ? 1 : 0; // graceful exit: hard exit races libuv teardown on Windows
