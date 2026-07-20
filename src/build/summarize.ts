@@ -61,9 +61,13 @@ export const extractiveClaims = (file: string, span: SpanRef, corpus: CorpusSnap
     const abs = span.startLine + i;
     const heading = HEADING_RE.exec(lines[i]);
     if (heading) {
+      // Cite the whole section (to the next heading or span end, capped) so the
+      // receipt shows the evidence, not just the headline.
+      let end = i + 1;
+      while (end < lines.length && !HEADING_RE.test(lines[end]) && end - i < 12) end++;
       claims.push({
         text: `Documents "${heading[2].trim()}".`,
-        citations: [{ kind: 'span', span: makeSpan(file, abs, abs, corpus) }],
+        citations: [{ kind: 'span', span: makeSpan(file, abs, span.startLine + end - 1, corpus) }],
         faithfulness: 'supported',
       });
       continue;

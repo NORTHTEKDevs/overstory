@@ -1,0 +1,5 @@
+overstory build — C:\Users\Krist\projects\active\overstory
+provider: ollama:qwen2.5:14b (reflexion rounds: 1)
+  leaves 1/18 src/cli/index.ts
+  leaves 2/18 src/core/bm25.ts
+  leaves 3/18 src/core/chunk.ts

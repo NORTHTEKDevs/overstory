@@ -24,16 +24,25 @@ Return ONLY JSON: {"claims":[{"text":"...","refs":["<claim id>", ...]}]}
 ${lines.join('\n')}`;
 };
 
-/** Deterministic roll-up: one claim per child, grounded in the child's first claim. */
+/** Deterministic roll-up: one claim per child, grounded in the child's first claim.
+ * Child detail is included only when it adds information — a child whose first claim is
+ * itself a roll-up ("Contains …") would produce noisy chains, so it is elided. */
 export const extractiveAggregate = (children: TreeNode[]): Omit<Claim, 'id'>[] =>
   children
     .filter((c) => c.claims.length > 0)
     .slice(0, 8)
-    .map((child) => ({
-      text: `Contains ${child.kind === 'leaf' ? child.path : `${child.title}/`} — ${child.claims[0].text}`,
-      citations: [{ kind: 'claim' as const, ref: { nodeId: child.id, claimId: child.claims[0].id } }],
-      faithfulness: 'supported' as const,
-    }));
+    .map((child) => {
+      const label = child.kind === 'leaf' ? child.path : `${child.title}/`;
+      const detail = child.claims[0].text;
+      const text = detail.startsWith('Contains ')
+        ? `Contains ${label} (${child.claims.length} claim${child.claims.length === 1 ? '' : 's'}).`
+        : `Contains ${label} — ${detail}`;
+      return {
+        text,
+        citations: [{ kind: 'claim' as const, ref: { nodeId: child.id, claimId: child.claims[0].id } }],
+        faithfulness: 'supported' as const,
+      };
+    });
 
 /** Interior-node claims. LLM path grounds every claim in child claim refs; invalid refs are
  * dropped; unusable output falls back to extractive. */

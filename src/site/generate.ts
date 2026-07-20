@@ -89,9 +89,13 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:point
 .seal.VERIFIED { color:var(--verified); border-color:rgba(127,176,105,.4); background:rgba(127,176,105,.08); }
 .seal.STALE { color:var(--stale); border-color:rgba(217,164,65,.4); background:rgba(217,164,65,.08); }
 .seal.OUT_OF_CORPUS, .seal.UNGROUNDED { color:var(--missing); border-color:rgba(196,85,77,.4); background:rgba(196,85,77,.08); }
-.claim-text { flex:1; font-size:14px; color:var(--text); }
+.claim-text { flex:1; min-width:0; font-size:14px; color:var(--text); overflow-wrap:anywhere; }
 .flag { flex:none; font:400 10.5px var(--mono); color:var(--missing); border:1px dashed rgba(196,85,77,.5); padding:1px 6px; border-radius:4px; margin-top:2px; }
 .flag.unchecked { color:var(--unchecked); border-color:rgba(138,148,139,.4); }
+.unfold { flex:none; display:inline-flex; align-items:center; gap:6px; margin-top:3px; font:400 10.5px var(--mono); color:var(--text3); white-space:nowrap; }
+.unfold .u-caret { display:inline-block; font-size:9px; transition:transform 120ms var(--ease); }
+.claim-row[aria-expanded="true"] .u-caret { transform:rotate(90deg); }
+.claim-row:hover .unfold { color:var(--text2); }
 .receipt { overflow:hidden; }
 .receipt-inner { margin:0 16px 14px 16px; border:1px solid var(--line); border-radius:6px; background:var(--bg0); }
 .receipt-top { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:8px 12px; border-bottom:1px dashed var(--line); font:400 11px var(--mono); color:var(--text2); }
@@ -323,6 +327,11 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:point
       f2.title = 'No semantic critique ran for this claim (budget or provider limits).';
       row.appendChild(f2);
     }
+    var nReceipts = claim.spans.length + claim.refs.length;
+    var unfold = el('span', 'unfold');
+    unfold.appendChild(el('span', '', nReceipts + (nReceipts === 1 ? ' receipt' : ' receipts')));
+    unfold.appendChild(el('span', 'u-caret', '\\u25B8'));
+    row.appendChild(unfold);
     var receipt = el('div', 'receipt');
     receipt.hidden = true;
     row.addEventListener('click', function () {

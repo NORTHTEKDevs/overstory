@@ -13,6 +13,12 @@ const DEFAULT_EXCLUDED_DIRS = new Set([
   '.idea', '.vscode', '.turbo', '.pytest_cache',
 ]);
 
+/** Machine-generated files that add noise, not knowledge. */
+const EXCLUDED_FILENAMES = new Set([
+  'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lockb', 'Cargo.lock',
+  'poetry.lock', 'uv.lock', 'Gemfile.lock', 'composer.lock', 'go.sum',
+]);
+
 const BINARY_EXTENSIONS =
   /\.(png|jpe?g|gif|webp|ico|icns|pdf|zip|gz|tgz|bz2|7z|rar|exe|dll|so|dylib|wasm|pyd|class|jar|woff2?|ttf|otf|eot|mp[34]|mov|avi|sqlite|db|bin|pack|idx|lock)$/iu;
 
@@ -94,6 +100,7 @@ export const loadCorpus = async (root: string, opts: LoadOptions = {}): Promise<
   candidates = candidates
     .map((f) => f.replace(/\\/gu, '/'))
     .filter((f) => !f.split('/').some((part) => DEFAULT_EXCLUDED_DIRS.has(part)))
+    .filter((f) => !EXCLUDED_FILENAMES.has(f.split('/').pop() ?? ''))
     .sort();
 
   const files = new Map<string, { hash: string; lines: string[] }>();
