@@ -1,5 +1,5 @@
-import { rm } from 'node:fs/promises';
-import { basename, dirname } from 'node:path';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 import { loadCorpus, LoadedCorpus } from '../core/corpus.js';
 import { applyVerification, verifyTree } from '../core/gate.js';
 import { loadTree, partialPath, saveTree, treePath } from '../core/store.js';
@@ -11,11 +11,12 @@ import { refineClaims } from './reflexion.js';
 import { summarizeFile } from './summarize.js';
 
 export interface ProgressEvent {
-  phase: 'scan' | 'leaves' | 'aggregate' | 'verify' | 'save';
+  phase: 'scan' | 'leaves' | 'aggregate' | 'verify' | 'save' | 'warn';
   done?: number;
   total?: number;
   file?: string;
   reused?: boolean;
+  message?: string;
 }
 
 export interface BuildOptions {
@@ -38,7 +39,39 @@ export interface BuildResult {
   corpus: LoadedCorpus;
   reusedLeaves: number;
   rebuiltLeaves: number;
+  /** Non-zero means the resume guarantee was degraded during this run — surfaced, never silent. */
+  checkpointFailures: number;
 }
+
+const lockPath = (root: string): string => join(root, '.overstory', 'build.lock');
+
+const pidAlive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+};
+
+/** Concurrent builds on one root are last-writer-wins corruption — refuse, loudly.
+ * A lock owned by a dead process is stale and reclaimed. */
+const acquireLock = async (root: string): Promise<void> => {
+  const path = lockPath(root);
+  await mkdir(dirname(path), { recursive: true });
+  try {
+    const existing = JSON.parse(await readFile(path, 'utf8')) as { pid?: number };
+    if (existing.pid && pidAlive(existing.pid)) {
+      throw new Error(
+        `another overstory build (pid ${existing.pid}) is already running for this root; wait for it, or delete ${path} if that process is gone`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('another overstory build')) throw err;
+    // missing or unreadable lock file: free to claim
+  }
+  await writeFile(path, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), 'utf8');
+};
 
 const dirOf = (file: string): string => {
   const d = dirname(file).replace(/\\/gu, '/');
@@ -66,11 +99,31 @@ const dirPaths = (files: string[]): string[] => {
 export const buildTree = async (root: string, opts: BuildOptions = {}): Promise<BuildResult> => {
   const provider = opts.provider ?? null;
   const critic = opts.critic ?? provider;
-  const reflexionRounds = opts.reflexionRounds ?? 1;
+  const reflexionRounds = Number.isFinite(opts.reflexionRounds) ? (opts.reflexionRounds as number) : 1;
   const emit = opts.onProgress ?? (() => {});
 
+  await acquireLock(root);
+  try {
+    return await buildTreeLocked(root, opts, provider, critic, reflexionRounds, emit);
+  } finally {
+    await rm(lockPath(root), { force: true });
+  }
+};
+
+const buildTreeLocked = async (
+  root: string,
+  opts: BuildOptions,
+  provider: ChatProvider | null,
+  critic: ChatProvider | null,
+  reflexionRounds: number,
+  emit: (e: ProgressEvent) => void,
+): Promise<BuildResult> => {
   emit({ phase: 'scan' });
-  const corpus = await loadCorpus(root, { include: opts.include, maxFiles: opts.maxFiles });
+  const corpusOptions = {
+    ...(opts.include ? { include: opts.include } : {}),
+    ...(Number.isFinite(opts.maxFiles) ? { maxFiles: opts.maxFiles } : {}),
+  };
+  const corpus = await loadCorpus(root, corpusOptions);
   const files = [...corpus.files.keys()];
   const previous = (await loadTree(partialPath(root))) ?? (await loadTree(treePath(root)));
 
@@ -78,6 +131,7 @@ export const buildTree = async (root: string, opts: BuildOptions = {}): Promise<
   let reusedLeaves = 0;
   let rebuiltLeaves = 0;
   let done = 0;
+  let checkpointFailures = 0;
   let checkpointChain = Promise.resolve();
 
   const checkpoint = () => {
@@ -87,10 +141,19 @@ export const buildTree = async (root: string, opts: BuildOptions = {}): Promise<
       root: 'root',
       nodes: { ...nodes },
       corpusFiles: Object.fromEntries(files.map((f) => [f, { hash: corpus.files.get(f)!.hash, lines: corpus.files.get(f)!.lines.length }])),
+      ...(Object.keys(corpusOptions).length ? { corpusOptions } : {}),
       builtAt: new Date().toISOString(),
       generator: opts.generator ?? '@northtek/overstory',
     };
-    checkpointChain = checkpointChain.then(() => saveTree(partialPath(root), snapshot)).catch(() => {});
+    checkpointChain = checkpointChain
+      .then(() => saveTree(partialPath(root), snapshot))
+      .catch((err) => {
+        checkpointFailures += 1;
+        emit({
+          phase: 'warn',
+          message: `checkpoint write failed (#${checkpointFailures}): ${err instanceof Error ? err.message : String(err)} — a killed build will NOT resume from this point`,
+        });
+      });
   };
 
   await mapPool(files, provider?.concurrency ?? 8, async (file) => {
@@ -180,6 +243,7 @@ export const buildTree = async (root: string, opts: BuildOptions = {}): Promise<
     root: 'root',
     nodes,
     corpusFiles: Object.fromEntries(files.map((f) => [f, { hash: corpus.files.get(f)!.hash, lines: corpus.files.get(f)!.lines.length }])),
+    ...(Object.keys(corpusOptions).length ? { corpusOptions } : {}),
     builtAt: new Date().toISOString(),
     generator: opts.generator ?? '@northtek/overstory',
   };
@@ -192,7 +256,7 @@ export const buildTree = async (root: string, opts: BuildOptions = {}): Promise<
   await saveTree(treePath(root), finalTree);
   await rm(partialPath(root), { force: true });
 
-  return { tree: finalTree, verification, corpus, reusedLeaves, rebuiltLeaves };
+  return { tree: finalTree, verification, corpus, reusedLeaves, rebuiltLeaves, checkpointFailures };
 };
 
 export interface VerifyResult {
@@ -202,11 +266,16 @@ export interface VerifyResult {
 }
 
 /** Read-only verification of an existing tree against the live corpus. Applies verdicts and
- * healed positions in-memory; never writes. Null when no tree exists. */
+ * healed positions in-memory; never writes. Null when no tree exists. The corpus is loaded
+ * with the OPTIONS THE TREE WAS BUILT WITH (caller may override) — verifying against a
+ * differently-scoped corpus yields wrong verdicts. */
 export const verifyExisting = async (root: string, opts: Pick<BuildOptions, 'include' | 'maxFiles'> = {}): Promise<VerifyResult | null> => {
   const stored = await loadTree(treePath(root));
   if (!stored) return null;
-  const corpus = await loadCorpus(root, { include: opts.include, maxFiles: opts.maxFiles });
+  const corpus = await loadCorpus(root, {
+    include: opts.include ?? stored.corpusOptions?.include,
+    maxFiles: opts.maxFiles ?? stored.corpusOptions?.maxFiles,
+  });
   const verification = verifyTree(stored, corpus);
   const tree = applyVerification(stored, verification);
   const staleFiles = [...new Set(

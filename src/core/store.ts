@@ -44,6 +44,9 @@ export const treeSchema = z.object({
   root: z.string(),
   nodes: z.record(z.string(), nodeSchema),
   corpusFiles: z.record(z.string(), z.object({ hash: z.string(), lines: z.number().int() })),
+  corpusOptions: z
+    .object({ include: z.array(z.string()).optional(), maxFiles: z.number().int().optional() })
+    .optional(),
   builtAt: z.string(),
   generator: z.string(),
 });

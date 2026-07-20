@@ -21,7 +21,9 @@ export const createOverstoryServer = (root: string): McpServer => {
   const load = async (): Promise<{ tree: Tree; corpus: CorpusSnapshot } | null> => {
     const tree = await loadTree(treePath(root));
     if (!tree) return null;
-    const corpus = await loadCorpus(root);
+    // Verify against the corpus the tree was BUILT with — a differently-scoped corpus
+    // produces wrong verdicts (files outside the default caps would read OUT_OF_CORPUS).
+    const corpus = await loadCorpus(root, tree.corpusOptions ?? {});
     return { tree, corpus };
   };
 
@@ -64,7 +66,7 @@ export const createOverstoryServer = (root: string): McpServer => {
       if (!loaded) return jsonError(NEEDS_BUILD);
       const { tree, corpus } = loaded;
       const node =
-        tree.nodes[idOrPath] ??
+        (Object.hasOwn(tree.nodes, idOrPath) ? tree.nodes[idOrPath] : undefined) ??
         Object.values(tree.nodes).find((n) => n.path === idOrPath || n.path === idOrPath.replace(/\\/gu, '/'));
       if (!node) return jsonError(`No node "${idOrPath}". Try overstory_map or overstory_search first.`);
       const verification = verifyTree(tree, corpus);

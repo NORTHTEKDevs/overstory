@@ -55,6 +55,9 @@ export const verifySpan = (span: SpanRef, corpus: CorpusSnapshot): SpanVerificat
   if (!file) return { verdict: 'OUT_OF_CORPUS' };
   const atRecorded = file.lines.slice(span.startLine - 1, span.endLine).join('\n');
   if (sha256(atRecorded) === span.contentHash) return { verdict: 'VERIFIED' };
+  // Healing anchors to the first byte-identical occurrence. When the text appears more
+  // than once, any occurrence is equally valid EVIDENCE (the receipt is the text itself,
+  // not its position), so first-match is deliberate, not an oversight.
   const moved = findText(file.lines, span.text);
   if (moved) return { verdict: 'VERIFIED', healed: moved };
   return { verdict: 'STALE' };
@@ -72,17 +75,23 @@ const worse = (a: Verdict, b: Verdict): Verdict => (SEVERITY[a] >= SEVERITY[b] ?
 /** Fail-closed claim verification. A claim is VERIFIED only when every citation
  * verifies. Any internally inconsistent receipt (text/hash mismatch — a forgery or
  * corruption) voids the claim's grounding entirely: UNGROUNDED. Interior claims
- * (citing child claims) verify transitively; staleness propagates upward. */
+ * (citing child claims) verify transitively; staleness propagates upward.
+ *
+ * `path` holds only the claims on the CURRENT recursion path (backtracked on return):
+ * true cycles fail closed, while duplicate citations of the same evidence — a common
+ * LLM habit — and diamond-shaped grounding verify correctly. Duplicate refs within one
+ * claim are verified once (evidence is idempotent). */
 export const verifyClaim = (
   claim: Claim,
   tree: Tree,
   corpus: CorpusSnapshot,
-  seen: Set<string> = new Set(),
+  path: Set<string> = new Set(),
 ): ClaimVerification => {
   const spans: SpanVerification[] = [];
   if (claim.citations.length === 0) return { claimId: claim.id, verdict: 'UNGROUNDED', spans };
 
   let verdict: Verdict = 'VERIFIED';
+  const refsVerified = new Set<string>();
   for (const citation of claim.citations) {
     if (citation.kind === 'span') {
       const { span } = citation;
@@ -94,14 +103,18 @@ export const verifyClaim = (
       verdict = worse(verdict, result.verdict);
     } else {
       const { nodeId, claimId } = citation.ref;
-      const child = tree.nodes[nodeId]?.claims.find((c) => c.id === claimId);
       const key = `${nodeId}:${claimId}`;
-      if (!child || seen.has(key)) {
+      if (refsVerified.has(key)) continue;
+      refsVerified.add(key);
+      const node = Object.hasOwn(tree.nodes, nodeId) ? tree.nodes[nodeId] : undefined;
+      const child = node?.claims.find((c) => c.id === claimId);
+      if (!child || path.has(key)) {
         verdict = worse(verdict, 'OUT_OF_CORPUS');
         continue;
       }
-      seen.add(key);
-      const childResult = verifyClaim(child, tree, corpus, seen);
+      path.add(key);
+      const childResult = verifyClaim(child, tree, corpus, path);
+      path.delete(key);
       verdict = worse(verdict, childResult.verdict);
     }
   }

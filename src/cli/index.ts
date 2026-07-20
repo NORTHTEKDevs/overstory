@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { buildTree, verifyExisting } from '../build/builder.js';
@@ -43,6 +44,15 @@ interface Flags {
   json: boolean;
 }
 
+/** A mis-typed numeric flag must error, never silently disable the cap it configures. */
+const numFlag = (raw: string | undefined, flag: string): number => {
+  const n = Number(raw);
+  if (raw === undefined || !Number.isFinite(n) || n < 0) {
+    throw new Error(`${flag} requires a non-negative number (got "${raw ?? ''}")`);
+  }
+  return n;
+};
+
 const parseArgs = (argv: string[]): { cmd: string; positional: string[]; flags: Flags } => {
   const flags: Flags = { provider: 'auto', rounds: 1, include: [], json: false };
   const positional: string[] = [];
@@ -51,9 +61,9 @@ const parseArgs = (argv: string[]): { cmd: string; positional: string[]; flags: 
     if (a === '--json') flags.json = true;
     else if (a === '--provider') flags.provider = argv[++i] ?? 'auto';
     else if (a === '--model') flags.model = argv[++i];
-    else if (a === '--rounds') flags.rounds = Number(argv[++i] ?? 1);
+    else if (a === '--rounds') flags.rounds = numFlag(argv[++i], '--rounds');
     else if (a === '--include') flags.include.push(argv[++i] ?? '');
-    else if (a === '--max-files') flags.maxFiles = Number(argv[++i]);
+    else if (a === '--max-files') flags.maxFiles = numFlag(argv[++i], '--max-files');
     else if (a === '--out') flags.out = argv[++i];
     else if (a === '--help' || a === '-h') positional.push('help');
     else positional.push(a);
@@ -87,11 +97,21 @@ const resolveProvider = async (flags: Flags): Promise<{ provider: ChatProvider |
 
 const main = async (): Promise<number> => {
   const { cmd, positional, flags } = parseArgs(process.argv.slice(2));
-  const root = resolve(positional[cmd === 'ask' ? 1 : 0] ?? '.');
+  const rootArg = positional[cmd === 'ask' ? 1 : 0];
+  const root = resolve(rootArg ?? '.');
 
   if (cmd === 'help') {
     process.stdout.write(HELP);
     return 0;
+  }
+
+  if (rootArg !== undefined && !existsSync(root)) {
+    log(
+      cmd === 'ask'
+        ? `path not found: ${root} — quote multi-word questions: overstory ask "your question here"`
+        : `path not found: ${root}`,
+    );
+    return 2;
   }
 
   if (cmd === 'build') {
@@ -112,6 +132,7 @@ const main = async (): Promise<number> => {
           log(lastLine);
         } else if (e.phase === 'aggregate' && e.done === 1) log('  rolling up directories…');
         else if (e.phase === 'verify') log('  gate sweep: verifying every receipt…');
+        else if (e.phase === 'warn') log(`  WARNING: ${e.message ?? 'unknown'}`);
       },
     });
     const secs = ((Date.now() - started) / 1000).toFixed(1);

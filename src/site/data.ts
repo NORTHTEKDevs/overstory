@@ -88,7 +88,8 @@ export const buildSiteData = (tree: Tree, verification: TreeVerification): SiteD
   }
 
   const worstOf = (id: string, seen = new Set<string>()): Verdict => {
-    if (seen.has(id)) return 'VERIFIED';
+    // Revisits report the already-computed worst (diamond shapes), never a blind VERIFIED.
+    if (seen.has(id)) return nodes[id]?.worst ?? 'VERIFIED';
     seen.add(id);
     const node = nodes[id];
     if (!node) return 'VERIFIED';

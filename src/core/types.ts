@@ -58,6 +58,9 @@ export interface Tree {
   root: string; // root node id
   nodes: Record<string, TreeNode>;
   corpusFiles: Record<string, CorpusFileMeta>; // state at build time
+  /** Corpus options the tree was built with. Verification MUST reuse these — verifying
+   * against a differently-scoped corpus produces wrong verdicts, not conservative ones. */
+  corpusOptions?: { include?: string[]; maxFiles?: number };
   builtAt: string;
   generator: string; // e.g. "@northtek/overstory@0.1.0"
 }

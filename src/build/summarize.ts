@@ -137,6 +137,7 @@ export const summarizeFile = async (
       continue;
     }
     const total = entry.lines.length;
+    const before = out.length;
     for (const d of drafts) {
       if (d.startLine > total || d.endLine < d.startLine) continue; // hallucinated range: drop
       out.push({
@@ -144,6 +145,11 @@ export const summarizeFile = async (
         citations: [{ kind: 'span', span: makeSpan(file, d.startLine, Math.min(d.endLine, total), corpus) }],
         faithfulness: 'unchecked',
       });
+    }
+    if (out.length === before) {
+      // Every draft had a hallucinated range — reject the batch loudly, not silently.
+      degraded = true;
+      out.push(...extractiveClaims(file, span, corpus));
     }
   }
 

@@ -91,8 +91,10 @@ const looksBinary = (buf: Buffer): boolean => {
  * binaries and oversized files skipped with reasons, content normalized, order
  * deterministic. */
 export const loadCorpus = async (root: string, opts: LoadOptions = {}): Promise<LoadedCorpus> => {
-  const maxFileBytes = opts.maxFileBytes ?? 1_000_000;
-  const maxFiles = opts.maxFiles ?? 5_000;
+  // Number.isFinite (not ??): NaN from a mis-parsed flag must fall back to the safe
+  // default, never silently disable a cap.
+  const maxFileBytes = Number.isFinite(opts.maxFileBytes) ? (opts.maxFileBytes as number) : 1_000_000;
+  const maxFiles = Number.isFinite(opts.maxFiles) ? (opts.maxFiles as number) : 5_000;
   const includeRes = opts.include?.map(globToRegex);
 
   let candidates = (opts.useGit ?? true) ? await listViaGit(root) : null;

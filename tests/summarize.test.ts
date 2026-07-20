@@ -92,9 +92,21 @@ describe('summarizeFile', () => {
     const provider = mockProvider([
       '{"claims":[{"text":"real claim","startLine":1,"endLine":2},{"text":"cites beyond EOF","startLine":900,"endLine":905}]}',
     ]);
-    const { claims } = await summarizeFile(provider, 'src/a.ts', corpus, 'p');
+    const { claims, degraded } = await summarizeFile(provider, 'src/a.ts', corpus, 'p');
     expect(claims).toHaveLength(1);
     expect(claims[0].text).toBe('real claim');
+    expect(degraded).toBe(false); // one valid claim survived — not a degraded chunk
+  });
+
+  it('flags degraded + falls back to extractive when EVERY draft has a hallucinated range', async () => {
+    const corpus = corpusOf({ 'src/a.ts': FILE });
+    const provider = mockProvider([
+      '{"claims":[{"text":"all invalid","startLine":900,"endLine":905},{"text":"also invalid","startLine":800,"endLine":801}]}',
+    ]);
+    const { claims, degraded } = await summarizeFile(provider, 'src/a.ts', corpus, 'p');
+    expect(degraded).toBe(true);
+    expect(claims.length).toBeGreaterThan(0); // extractive fallback, never zero claims silently
+    expect(claims.every((c) => c.faithfulness === 'supported')).toBe(true);
   });
 
   it('extractive path when provider is null', async () => {

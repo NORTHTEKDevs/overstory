@@ -8,9 +8,10 @@ support it. Citations are verified mechanically, not displayed decoratively: a c
 evidence changed is marked stale, a claim whose evidence vanished is marked missing, and a
 claim with no evidence is never presented as verified.
 
-Local-first by construction. Your code never leaves your machine: summarize with a local
-model via Ollama, with the Anthropic API if you choose, or with the deterministic extractive
-engine that needs no LLM at all.
+Local-first by default. With the local Ollama engine or the deterministic extractive engine
+(no LLM at all), your code never leaves your machine — air-gapped works. The Anthropic API is
+an explicit opt-in, and only then does source text leave the machine (to Anthropic, for
+summarization). The gate itself is always local.
 
 ```
 npx @northtek/overstory build     # build the tree (resumable; reuses unchanged files)
