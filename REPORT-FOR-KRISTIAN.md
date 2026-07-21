@@ -1,5 +1,37 @@
 # OVERSTORY — Autonomous Build Report
 
+## v3 addendum (2026-07-21): the hosted registry — LIVE
+
+Your ask ("connect to GitHub, upload local codebase, it verifies it") shipped as a **verified
+registry**, deployed and public:
+
+- **Live now:** https://overstory-pacy5uhfg-kristians-projects-6e13f870.vercel.app (project
+  `overstory` on your Vercel; overstory.northtek.io attached + verified, DNS propagating).
+- **Paste a repo → instant tree:** server fetches the GitHub tarball, builds a deterministic
+  extractive tree, runs the gate, serves the explorer — measured 1.4-1.7s for real repos
+  (factgate, genome), zero LLM, zero per-request cost beyond the function.
+- **`overstory publish`:** uploads your locally-built rich tree; the server independently
+  re-fetches the repo and re-runs the gate — **100% verified or rejected with the failing
+  receipts named**. No auth needed: you cannot publish lies about code, so identity doesn't
+  gate truth. No raw code is ever uploaded — only trees (cited spans of already-public code).
+- **Live README badge** (`/badge/gh/OWNER/REPO.svg`): recomputed from the actual gate against
+  the live repo, decays honestly. The viral loop.
+- **Architecture call (flagging per protocol):** the server never runs an LLM — building
+  needs a model, verifying is hashing. That keeps it ~$0 on Vercel+Neon, no new vendors, and
+  preserves the privacy moat (DeepWiki-style cloud builds for private repos = the documented
+  PAID tier, not v1). 115/115 tests incl. the registry trust suite (tampered trees rejected
+  by name, wrong-repo trees rejected, freshness decay honest). drizzle-orm patched for
+  GHSA-gpj5 (SQL-identifier injection); remaining npm-audit moderate is a dev-time
+  postcss-via-next path, noted not hidden.
+
+**Two things need you:**
+1. **Neon OAuth** — a neonctl browser window is waiting for approval on your machine. Approve
+   it and tell me (or run: `npx neonctl projects create --name overstory-registry`, then
+   `psql "$DATABASE_URL" -f web/schema.sql`, add DATABASE_URL to the Vercel project, redeploy).
+   Until then the registry runs stateless: instant trees + badges work; publish honestly 503s.
+2. Same two as before: flip the repo public + `npm publish` (the CLI's publish command points
+   at overstory.northtek.io and is ready the moment both land).
+
 ## v2 addendum (2026-07-20): the frontier-lab app
 
 You rejected the v1 dark operator-console UI and asked for Perplexity/ChatGPT-class product

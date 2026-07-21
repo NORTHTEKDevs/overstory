@@ -64,6 +64,27 @@ build time and labeled. Every claim is one click from its evidence; judge it you
 Builds are incremental and resumable: every leaf checkpoints on completion, and unchanged
 files are never re-summarized.
 
+## The registry: overstory.northtek.io
+
+Paste any public GitHub repo and get an instant hosted tree — built and verified server-side
+from the repo's actual content, deterministic and LLM-free. Built something richer locally?
+
+```
+npx @northtek/overstory build && npx @northtek/overstory publish
+```
+
+The registry **re-verifies every receipt against GitHub before accepting** — it trusts the
+code, not the uploader; a tree that isn't 100% verifiable is rejected with the failing
+receipts named. Accepted trees get a hosted explorer and a live freshness badge that decays
+honestly as the repo moves on:
+
+```
+[![overstory](https://overstory.northtek.io/badge/gh/OWNER/REPO.svg)](https://overstory.northtek.io/gh/OWNER/REPO)
+```
+
+The registry never runs an LLM and never sees private code — private repos stay on
+`overstory serve`, on your machine.
+
 ## MCP: notarize your agent's answers
 
 `overstory mcp` exposes `overstory_map`, `overstory_search`, `overstory_node`, and the tool
