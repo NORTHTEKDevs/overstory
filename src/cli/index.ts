@@ -21,6 +21,7 @@ Usage:
   overstory serve  [path]   Open the app: ask your codebase, every answer notarized
   overstory verify [path]   Check every receipt against the current code (exit 1 if any fail)
   overstory ask "question" [path]   Answer from the tree with per-sentence receipts
+  overstory publish [path]  Publish your tree to the registry (re-verified server-side)
   overstory site   [path]   Export the shareable single-file explorer
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
 
@@ -205,6 +206,41 @@ const main = async (): Promise<number> => {
     await writeFile(out, html, 'utf8');
     log(`explorer written: ${out} (${(html.length / 1024).toFixed(0)} KB, single file, works offline)`);
     return 0;
+  }
+
+  if (cmd === 'publish') {
+    const { DEFAULT_REGISTRY, detectGithubRepo, publishTree } = await import('../registry/publishClient.js');
+    const tree = await loadTree(treePath(root));
+    if (!tree) {
+      log('No tree found. Run: overstory build   (then publish)');
+      return 2;
+    }
+    const repoFlagIdx = process.argv.indexOf('--repo');
+    const repoFlag = repoFlagIdx >= 0 ? process.argv[repoFlagIdx + 1] : undefined;
+    const parsed = repoFlag?.includes('/')
+      ? { owner: repoFlag.split('/')[0], repo: repoFlag.split('/')[1] }
+      : await detectGithubRepo(root);
+    if (!parsed) {
+      log('Could not detect a GitHub remote. Pass --repo owner/name.');
+      return 2;
+    }
+    const registry = process.env.OVERSTORY_REGISTRY ?? DEFAULT_REGISTRY;
+    log(`publishing ${parsed.owner}/${parsed.repo} to ${registry} — the registry will re-verify every receipt against GitHub before accepting`);
+    const result = await publishTree(registry, parsed.owner, parsed.repo, 'HEAD', tree);
+    if (flags.json) {
+      process.stdout.write(JSON.stringify(result) + '\n');
+      return result.verdict?.accepted ? 0 : 1;
+    }
+    if (result.verdict?.accepted) {
+      log(`ACCEPTED — ${result.verdict.verified}/${result.verdict.claims} receipts verified against GitHub`);
+      if (result.url) log(`hosted: ${result.url}`);
+      if (result.badge) log(`badge:  ${result.badge}`);
+      return 0;
+    }
+    log(`REJECTED — ${result.verdict?.verified ?? 0}/${result.verdict?.claims ?? 0} receipts verified (the registry hosts only 100%-verified trees)`);
+    for (const f of result.verdict?.failures ?? []) log(`  [${f.verdict}] ${f.claimId}: ${f.text}`);
+    log('fix: push your latest code, run overstory build, then publish again');
+    return 1;
   }
 
   if (cmd === 'serve') {
