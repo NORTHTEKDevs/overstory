@@ -73,14 +73,14 @@ const acquireLock = async (root: string): Promise<void> => {
   await writeFile(path, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), 'utf8');
 };
 
-const dirOf = (file: string): string => {
+export const dirOf = (file: string): string => {
   const d = dirname(file).replace(/\\/gu, '/');
   return d === '.' ? '' : d;
 };
 
 /** All ancestor dir paths for a set of files, deepest first (so children exist before
  * their parent aggregates). */
-const dirPaths = (files: string[]): string[] => {
+export const dirPaths = (files: string[]): string[] => {
   const dirs = new Set<string>();
   for (const f of files) {
     let d = dirOf(f);
