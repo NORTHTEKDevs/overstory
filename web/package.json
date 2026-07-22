@@ -17,5 +17,8 @@
     "@types/node": "^26.0.0",
     "@types/react": "^19.1.0",
     "typescript": "5.8.2"
+  },
+  "overrides": {
+    "sharp": "^0.35.3"
   }
 }
