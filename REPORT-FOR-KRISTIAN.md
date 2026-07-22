@@ -1,5 +1,29 @@
 # OVERSTORY — Autonomous Build Report
 
+## v3.1 addendum (2026-07-22): ZERO-STORAGE — your custody concern, solved by deletion
+
+You said you don't want to store other people's code. The registry now stores **nothing**:
+the entire database layer is deleted (Neon never needed — close any OAuth window). The
+user's repo IS the database: publishing = committing `.overstory/tree.json` (or a release
+asset); the registry fetches THEIR tree from THEIR repo, verifies it against THEIR code
+live on every view, CDN-caches the render. No code, no trees, no accounts, no custody, no
+GDPR surface, ~$0 forever. Private code: local `serve`, or they self-host the registry
+(their infra — your paid tier).
+
+- LIVE at https://overstory-virid.vercel.app (stable prod domain). 108/108 tests.
+- Live-verified: instant tree of `rain` in 2.2s; /api/check gives correct not-published
+  hints; our own tree.json is committed (250 claims, 100%) — full publish loop E2E'd up to
+  the honest final answer "repo not found (or private)". **Flip the repo public and
+  /gh/NORTHTEKDevs/overstory becomes the flagship demo instantly.**
+- The publish preflight caught its own release twice (stale tree after code edits) — the
+  dogfood loop works.
+- Security: sharp high-severity cleared (override 0.35.3). Two moderates remain, both
+  documented non-exposures: @hono/node-server traversal (patch is 2.x-only, MCP SDK pins
+  1.x; we use stdio transport, never hono static serving) and postcss-via-next (dev-time).
+- **DNS needs you:** northtek.io is on Google Cloud DNS (not Vercel). Either run
+  `! gcloud auth login` in session (I'll add the CNAME), or add manually:
+  `overstory.northtek.io CNAME cname.vercel-dns.com`.
+
 ## v3 addendum (2026-07-21): the hosted registry — LIVE
 
 Your ask ("connect to GitHub, upload local codebase, it verifies it") shipped as a **verified
