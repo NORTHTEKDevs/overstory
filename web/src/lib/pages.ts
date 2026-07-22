@@ -13,7 +13,12 @@ export const explorerHtml = (
 ): string => {
   const verification = snapshot ? verifyTree(tree, snapshot.corpus) : null;
   const data = buildSiteData(tree, verification ?? verifyTree(tree, { root: '', files: new Map() }));
-  const base = generateSiteHtml(data);
+  const base = generateSiteHtml(data, {
+    ask: {
+      cloneUrl: `https://github.com/${meta.owner}/${meta.repo}.git`,
+      repoLabel: meta.repo,
+    },
+  });
   const pct = Math.round(data.freshness * 100);
   const bar = `
 <div style="position:fixed;top:0;left:0;right:0;z-index:99;display:flex;gap:14px;align-items:center;padding:8px 16px;background:var(--bg1);border-bottom:1px solid var(--line);font:500 12px 'JetBrains Mono',monospace;">

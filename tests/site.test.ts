@@ -63,4 +63,22 @@ describe('generateSiteHtml', () => {
     expect(html).toContain('— OVERSTORY</title>');
     expect(html).toContain('proves provenance, not truth');
   });
+
+  it('embedded client script is syntactically valid JavaScript (escape-layer regression guard)', () => {
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/gu)].map((m) => m[1]);
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const src of scripts) expect(() => new Function(src)).not.toThrow();
+  });
+
+  it('ask panel is absent by default (offline export) and present with registry options', () => {
+    expect(html).toContain('"overstory-ask-config" type="application/json">null<');
+    const withAsk = generateSiteHtml(data, { ask: { cloneUrl: 'https://github.com/o/r.git', repoLabel: 'r' } });
+    expect(withAsk).toContain('Ask this codebase');
+    expect(withAsk).toContain('anthropic-dangerous-direct-browser-access');
+    expect(withAsk).toContain('sessionStorage');
+    expect(withAsk).toContain('https://github.com/o/r.git');
+    for (const m of [...withAsk.matchAll(/<script>([\s\S]*?)<\/script>/gu)]) {
+      expect(() => new Function(m[1])).not.toThrow();
+    }
+  });
 });
