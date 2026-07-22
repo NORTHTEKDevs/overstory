@@ -47,7 +47,12 @@ export const checkPublished = async (
     headers: { 'content-type': 'application/json', 'user-agent': 'overstory-cli' },
     body: JSON.stringify({ owner, repo }),
   });
-  const body = (await res.json()) as CheckResponse & { error?: string };
+  let body: CheckResponse & { error?: string };
+  try {
+    body = (await res.json()) as CheckResponse & { error?: string };
+  } catch {
+    throw new Error(`registry returned HTTP ${res.status} with a non-JSON body — check OVERSTORY_REGISTRY points at the registry root`);
+  }
   if (!res.ok && res.status !== 404) throw new Error(body.error ?? `registry returned HTTP ${res.status}`);
   return body;
 };
