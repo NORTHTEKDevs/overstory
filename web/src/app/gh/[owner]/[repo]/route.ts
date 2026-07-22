@@ -1,45 +1,40 @@
-import { fetchGithubSnapshot, instantTree } from '../../../../lib/engine.js';
+import { fetchGithubSnapshot, fetchRepoTree, instantTree } from '../../../../lib/engine.js';
 import { errorHtml, explorerHtml } from '../../../../lib/pages.js';
-import { getStoredTree, rateLimit } from '../../../../lib/store.js';
+import { rateLimit } from '../../../../lib/limits.js';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const html = (body: string, status = 200, cache = 'public, s-maxage=300, stale-while-revalidate=3600'): Response =>
+const html = (body: string, status = 200, cache = 'public, s-maxage=600, stale-while-revalidate=3600'): Response =>
   new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': cache } });
 
+/** Fully stateless: the owner's repo is the database. If they committed a tree, render it
+ * with LIVE verdicts (freshness computed here, against the code, every time the cache
+ * misses). Otherwise: instant extractive tree. Nothing is ever stored. */
 export const GET = async (req: Request, ctx: { params: Promise<{ owner: string; repo: string }> }): Promise<Response> => {
   const { owner, repo } = await ctx.params;
   if (!/^[\w.-]+$/u.test(owner) || !/^[\w.-]+$/u.test(repo)) {
     return html(errorHtml('Not a repository', 'That does not look like a GitHub owner/repo.'), 404, 'no-store');
   }
-
-  // Published (rich) tree first — re-verified live against GitHub so freshness is honest.
-  try {
-    const stored = await getStoredTree(owner, repo);
-    if (stored) {
-      const snapshot = await fetchGithubSnapshot(owner, repo).catch(() => null);
-      return html(
-        explorerHtml(stored.tree, snapshot, {
-          owner,
-          repo,
-          sha: stored.commitSha,
-          builtWith: stored.builtWith,
-          verifiedAt: snapshot ? 'just now' : stored.lastVerifiedAt.toISOString().slice(0, 10),
-        }),
-      );
-    }
-  } catch {
-    // storage unavailable -> stateless path below
-  }
-
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0] ?? 'unknown';
-  if (!rateLimit(`build:${ip}`, 20)) {
-    return html(errorHtml('Slow down', 'Too many new trees from this address — try again in an hour.'), 429, 'no-store');
+  if (!rateLimit(`view:${ip}`, 60)) {
+    return html(errorHtml('Slow down', 'Too many requests from this address — try again shortly.'), 429, 'no-store');
   }
 
   try {
     const snapshot = await fetchGithubSnapshot(owner, repo);
+    const published = await fetchRepoTree(owner, repo);
+    if (published) {
+      return html(
+        explorerHtml(published.tree, snapshot, {
+          owner,
+          repo,
+          sha: snapshot.sha,
+          builtWith: `published by the repo (${published.source})`,
+          verifiedAt: 'just now',
+        }),
+      );
+    }
     const { tree } = await instantTree(snapshot, repo);
     return html(
       explorerHtml(tree, snapshot, {

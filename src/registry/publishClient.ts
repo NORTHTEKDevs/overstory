@@ -1,7 +1,5 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { Tree } from '../core/types.js';
-import type { PublishVerdict } from './registry.js';
 
 const execFileP = promisify(execFile);
 
@@ -22,30 +20,34 @@ export const detectGithubRepo = async (root: string): Promise<{ owner: string; r
   }
 };
 
-export interface PublishResponse {
-  verdict: PublishVerdict;
+export interface CheckResponse {
+  published: boolean;
+  source?: string;
+  sha?: string;
+  freshness?: number;
+  verified?: number;
+  claims?: number;
   url?: string;
   badge?: string;
+  hint?: string;
 }
 
-/** Upload a locally-built tree; the registry re-verifies every receipt against GitHub
- * before accepting. A rejection is a feature, not an error — it lists the receipts that
- * failed so `overstory build` can be re-run. */
-export const publishTree = async (
+/** Zero-storage publishing: the tree lives in YOUR repo (.overstory/tree.json or a release
+ * asset). This asks the registry to fetch your tree from your repo and verify it against
+ * your code — the registry stores nothing, ever. */
+export const checkPublished = async (
   registry: string,
   owner: string,
   repo: string,
-  ref: string,
-  tree: Tree,
   fetchImpl: typeof fetch = fetch,
-): Promise<PublishResponse> => {
-  const res = await fetchImpl(`${registry.replace(/\/$/u, '')}/api/publish`, {
+): Promise<CheckResponse> => {
+  const res = await fetchImpl(`${registry.replace(/\/$/u, '')}/api/check`, {
     method: 'POST',
     signal: AbortSignal.timeout(120_000),
     headers: { 'content-type': 'application/json', 'user-agent': 'overstory-cli' },
-    body: JSON.stringify({ owner, repo, ref, tree }),
+    body: JSON.stringify({ owner, repo }),
   });
-  const body = (await res.json()) as PublishResponse & { error?: string };
-  if (!res.ok && !body.verdict) throw new Error(body.error ?? `registry returned HTTP ${res.status}`);
+  const body = (await res.json()) as CheckResponse & { error?: string };
+  if (!res.ok && res.status !== 404) throw new Error(body.error ?? `registry returned HTTP ${res.status}`);
   return body;
 };

@@ -209,11 +209,18 @@ const main = async (): Promise<number> => {
   }
 
   if (cmd === 'publish') {
-    const { DEFAULT_REGISTRY, detectGithubRepo, publishTree } = await import('../registry/publishClient.js');
+    const { DEFAULT_REGISTRY, checkPublished, detectGithubRepo } = await import('../registry/publishClient.js');
     const tree = await loadTree(treePath(root));
     if (!tree) {
       log('No tree found. Run: overstory build   (then publish)');
       return 2;
+    }
+    // Local preflight: the registry will verify against GitHub; verify here first so the
+    // instructions we print are ones that will actually succeed.
+    const local = await verifyExisting(root);
+    if (local && local.verification.freshness < 1) {
+      log(`your tree is ${Math.round(local.verification.freshness * 100)}% verified locally — run overstory build first (stale: ${local.staleFiles.join(', ')})`);
+      return 1;
     }
     const repoFlagIdx = process.argv.indexOf('--repo');
     const repoFlag = repoFlagIdx >= 0 ? process.argv[repoFlagIdx + 1] : undefined;
@@ -225,22 +232,25 @@ const main = async (): Promise<number> => {
       return 2;
     }
     const registry = process.env.OVERSTORY_REGISTRY ?? DEFAULT_REGISTRY;
-    log(`publishing ${parsed.owner}/${parsed.repo} to ${registry} — the registry will re-verify every receipt against GitHub before accepting`);
-    const result = await publishTree(registry, parsed.owner, parsed.repo, 'HEAD', tree);
+    log('publishing is a git push: your repo is the database, the registry stores nothing.');
+    const result = await checkPublished(registry, parsed.owner, parsed.repo);
     if (flags.json) {
       process.stdout.write(JSON.stringify(result) + '\n');
-      return result.verdict?.accepted ? 0 : 1;
+      return result.published && result.freshness === 1 ? 0 : 1;
     }
-    if (result.verdict?.accepted) {
-      log(`ACCEPTED — ${result.verdict.verified}/${result.verdict.claims} receipts verified against GitHub`);
-      if (result.url) log(`hosted: ${result.url}`);
-      if (result.badge) log(`badge:  ${result.badge}`);
-      return 0;
+    if (!result.published) {
+      log('your tree is not in the repo yet. Commit and push it:');
+      log('  git add -f .overstory/tree.json');
+      log('  git commit -m "docs: overstory tree" && git push');
+      log('then run overstory publish again to confirm the registry sees it.');
+      return 1;
     }
-    log(`REJECTED — ${result.verdict?.verified ?? 0}/${result.verdict?.claims ?? 0} receipts verified (the registry hosts only 100%-verified trees)`);
-    for (const f of result.verdict?.failures ?? []) log(`  [${f.verdict}] ${f.claimId}: ${f.text}`);
-    log('fix: push your latest code, run overstory build, then publish again');
-    return 1;
+    const pct = Math.round((result.freshness ?? 0) * 100);
+    log(`published (${result.source}) — ${pct}% verified against GitHub @ ${result.sha?.slice(0, 7)}`);
+    if (pct < 100) log('note: your pushed code is ahead of your pushed tree — rebuild, recommit tree.json, push.');
+    if (result.url) log(`hosted: ${result.url}`);
+    if (result.badge) log(`badge:  ${result.badge}`);
+    return pct === 100 ? 0 : 1;
   }
 
   if (cmd === 'serve') {

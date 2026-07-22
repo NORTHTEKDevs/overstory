@@ -79,20 +79,22 @@ footer a{color:var(--text2)}
     <a href="/gh/NORTHTEKDevs/genome">NORTHTEKDevs/genome</a>
     <a href="/gh/NORTHTEKDevs/factgate">NORTHTEKDevs/factgate</a>
   </div>
-  <p class="honesty">Instant trees are deterministic and LLM-free. The registry never runs a model and never trusts an uploader — it re-checks every receipt itself.</p>
+  <p class="honesty">Instant trees are deterministic and LLM-free. The registry stores nothing — no code, no trees, no accounts. Your repo is the database; every verdict is computed fresh against your code.</p>
 </section>
 
 <section class="steps">
   <div class="step"><div class="n">01 · EXPLORE</div><h3>Paste a repo</h3><p>An instant tree, built and verified server-side from the repo's actual content. Nothing generated, nothing hallucinated — extractive claims with line receipts.</p></div>
   <div class="step"><div class="n">02 · BUILD RICH</div><h3>Build locally</h3><p>Run <code>npx @northtek/overstory build</code> with your local model or API key. Your code and your model stay on your machine.</p></div>
-  <div class="step"><div class="n">03 · PUBLISH</div><h3>Publish with proof</h3><p><code>overstory publish</code> uploads only the tree. The registry re-verifies every receipt against GitHub — a tree that isn't 100% verifiable is rejected, never hosted.</p></div>
+  <div class="step"><div class="n">03 · PUBLISH</div><h3>Publishing is a git push</h3><p>Commit <code>.overstory/tree.json</code> to your repo. The registry fetches your tree from <em>your</em> repo and verifies it against <em>your</em> code on every view — it stores nothing, ever.</p></div>
 </section>
 
 <section class="publish">
   <h2>Docs that know when they're lying</h2>
   <p>Published trees are re-verified against the live repo. When the code moves on, the freshness badge says so — in your README, honestly.</p>
-  <pre>npx @northtek/overstory build     # local model or API — your choice
-npx @northtek/overstory publish   # server re-verifies, then hosts
+  <pre>npx @northtek/overstory build       # local model or API — your choice
+git add -f .overstory/tree.json     # the tree lives in YOUR repo
+git commit -m "docs: overstory tree" && git push
+npx @northtek/overstory publish     # confirms the registry can verify it
 
 [![overstory](https://overstory.northtek.io/badge/gh/OWNER/REPO.svg)](https://overstory.northtek.io/gh/OWNER/REPO)</pre>
   <div class="badge-demo">

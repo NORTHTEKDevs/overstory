@@ -24,4 +24,5 @@ export { fetchGithubSnapshot, snapshotFromTarball, readTar } from './registry/gi
 export type { GithubSnapshot, FetchOptions } from './registry/github.js';
 export { instantTree, adjudicatePublish, reverify } from './registry/registry.js';
 export type { PublishVerdict } from './registry/registry.js';
-export { parseGithubRemote, publishTree, DEFAULT_REGISTRY } from './registry/publishClient.js';
+export { parseGithubRemote, checkPublished, DEFAULT_REGISTRY } from './registry/publishClient.js';
+export { fetchRepoTree } from './registry/repoTree.js';

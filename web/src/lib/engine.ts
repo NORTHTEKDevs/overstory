@@ -3,6 +3,7 @@
 export { fetchGithubSnapshot } from '../../../src/registry/github.js';
 export type { GithubSnapshot } from '../../../src/registry/github.js';
 export { adjudicatePublish, instantTree, reverify } from '../../../src/registry/registry.js';
+export { fetchRepoTree } from '../../../src/registry/repoTree.js';
 export { buildSiteData } from '../../../src/site/data.js';
 export { generateSiteHtml } from '../../../src/site/generate.js';
 export { verifyTree } from '../../../src/core/gate.js';
