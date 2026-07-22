@@ -171,6 +171,18 @@ textarea { font:inherit; color:inherit; }
 .claim .fl.unsupported { color:var(--missing); border-color:var(--missing); }
 .claim .r-wrap { padding:0 12px 12px; }
 .empty { padding:60px 24px; text-align:center; color:var(--text2); font-size:14px; }
+.fixwrap { max-width:800px; margin:0 auto; padding:30px 32px 80px; }
+.fix-intro { color:var(--text2); font-size:13.5px; max-width:68ch; margin:6px 0 20px; }
+.fixcard { background:var(--surface); border:1px solid var(--line); border-radius:11px; box-shadow:var(--shadow-sm); margin-bottom:10px; display:flex; gap:12px; align-items:flex-start; padding:13px 16px; }
+.fixcard .sev { flex:none; margin-top:2px; font:500 10px var(--mono); padding:1px 8px; border-radius:999px; border:1px solid var(--line); color:var(--text3); }
+.fixcard .sev.s1 { color:var(--missing); border-color:color-mix(in srgb, var(--missing) 45%, transparent); }
+.fixcard .sev.s2 { color:var(--stale); border-color:color-mix(in srgb, var(--stale) 45%, transparent); }
+.fixcard .body { flex:1; min-width:0; }
+.fixcard .t { font:500 13.5px var(--sans); overflow-wrap:anywhere; }
+.fixcard .d { font-size:12.5px; color:var(--text2); margin-top:2px; overflow-wrap:anywhere; }
+.fixcard .m { font:400 10.5px var(--mono); color:var(--text3); margin-top:5px; }
+.fixcard .copy { flex:none; padding:6px 12px; border:1px solid var(--line); border-radius:7px; font-size:12px; color:var(--accent); white-space:nowrap; }
+.fixcard .copy:hover { border-color:var(--accent); }
 .empty .cmd { display:inline-block; margin-top:14px; font:400 13px var(--mono); background:var(--surface); border:1px solid var(--line); padding:8px 14px; border-radius:9px; }
 .errbox { margin:10px 0; border:1px solid var(--missing); border-radius:10px; padding:10px 14px; color:var(--missing); font-size:13px; }
 
@@ -202,6 +214,7 @@ textarea { font:inherit; color:inherit; }
     <div class="nav">
       <button id="navAsk" class="active"><span class="ico">&#9906;</span> Ask</button>
       <button id="navLib"><span class="ico">&#10514;</span> Library</button>
+      <button id="navFix"><span class="ico">&#9998;</span> Fixes</button>
     </div>
     <div class="threads-label">Threads</div>
     <nav class="threads" id="threadList" aria-label="Threads"></nav>
@@ -403,12 +416,52 @@ textarea { font:inherit; color:inherit; }
   function render() {
     var view = document.getElementById('view');
     view.textContent = '';
-    document.getElementById('navAsk').classList.toggle('active', state.view !== 'lib');
+    document.getElementById('navAsk').classList.toggle('active', state.view !== 'lib' && state.view !== 'fix');
     document.getElementById('navLib').classList.toggle('active', state.view === 'lib');
+    document.getElementById('navFix').classList.toggle('active', state.view === 'fix');
     if (state.overview && state.overview.error) { view.appendChild(renderNoTree()); return; }
     if (state.view === 'lib') { view.appendChild(renderLibrary()); return; }
+    if (state.view === 'fix') { view.appendChild(renderFixView()); return; }
     if (state.view === 'thread' && state.thread) { view.appendChild(renderThread()); return; }
     view.appendChild(renderHome());
+  }
+
+  function renderFixView() {
+    var wrap = el('div', 'fixwrap');
+    if (!state.treeData) {
+      fetchJson('/api/tree').then(function (d) {
+        if (d.error) return;
+        state.treeData = d;
+        Object.keys(d.nodes).forEach(function (id) { if (d.nodes[id].kind !== 'leaf') state.libOpen[id] = true; });
+        render();
+      });
+      wrap.appendChild(el('div', 'empty', 'Scanning the tree\\u2026'));
+      return wrap;
+    }
+    var findings = state.treeData.findings || [];
+    wrap.appendChild(el('h2', 'node-h', 'Fix prompts'));
+    wrap.appendChild(el('div', 'fix-intro', 'Paste-ready prompts for your coding agent, generated from the verified tree. Each is grounded in receipts, scoped to one bounded change, and ends with machine-checkable acceptance criteria \\u2014 including rebuilding this tree to prove the fix landed. One prompt per session; smallest diff wins.'));
+    if (!findings.length) { wrap.appendChild(el('div', 'empty', 'No findings \\u2014 clean by every deterministic check.')); return wrap; }
+    var sevWord = { 1: 'fix first', 2: 'soon', 3: 'later' };
+    findings.forEach(function (f) {
+      var card = el('div', 'fixcard');
+      card.appendChild(el('span', 'sev s' + f.severity, sevWord[f.severity]));
+      var body = el('div', 'body');
+      body.appendChild(el('div', 't', f.title));
+      body.appendChild(el('div', 'd', f.detail));
+      body.appendChild(el('div', 'm', f.kind + ' \\u00B7 ' + f.receipts + ' receipt' + (f.receipts === 1 ? '' : 's')));
+      card.appendChild(body);
+      var copy = el('button', 'copy', 'Copy prompt');
+      copy.addEventListener('click', function () {
+        navigator.clipboard.writeText(f.prompt).then(function () {
+          copy.textContent = 'Copied \\u2713';
+          setTimeout(function () { copy.textContent = 'Copy prompt'; }, 1500);
+        });
+      });
+      card.appendChild(copy);
+      wrap.appendChild(card);
+    });
+    return wrap;
   }
 
   function renderNoTree() {
@@ -734,6 +787,7 @@ textarea { font:inherit; color:inherit; }
     state.view = state.thread ? 'thread' : 'home'; render();
   });
   document.getElementById('navLib').addEventListener('click', function () { state.view = 'lib'; render(); });
+  document.getElementById('navFix').addEventListener('click', function () { state.view = 'fix'; render(); });
   document.getElementById('menuBtn') && document.getElementById('menuBtn').addEventListener('click', function () {
     document.getElementById('side').classList.toggle('open');
   });

@@ -21,6 +21,7 @@ Usage:
   overstory serve  [path]   Open the app: ask your codebase, every answer notarized
   overstory verify [path]   Check every receipt against the current code (exit 1 if any fail)
   overstory ask "question" [path]   Answer from the tree with per-sentence receipts
+  overstory fix    [path]   Paste-ready fix prompts for your agent, grounded in receipts
   overstory publish [path]  Publish your tree to the registry (re-verified server-side)
   overstory site   [path]   Export the shareable single-file explorer
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
@@ -201,10 +202,45 @@ const main = async (): Promise<number> => {
     }
     const corpus = await loadCorpus(root, tree.corpusOptions ?? {});
     const verification = verifyTree(tree, corpus);
-    const html = generateSiteHtml(buildSiteData(tree, verification));
+    const html = generateSiteHtml(buildSiteData(tree, verification, corpus));
     const out = flags.out ?? join(root, '.overstory', 'site.html');
     await writeFile(out, html, 'utf8');
     log(`explorer written: ${out} (${(html.length / 1024).toFixed(0)} KB, single file, works offline)`);
+    return 0;
+  }
+
+  if (cmd === 'fix') {
+    const { scanFindings } = await import('../fix/scan.js');
+    const { findingsToMarkdown } = await import('../fix/prompts.js');
+    const tree = await loadTree(treePath(root));
+    if (!tree) {
+      log('No tree found. Run: overstory build   (then fix)');
+      return 2;
+    }
+    const corpus = await loadCorpus(root, tree.corpusOptions ?? {});
+    const verification = verifyTree(tree, corpus);
+    // Scan the WHOLE repo, not the tree's build scope — a scope of src/** literally cannot
+    // see tests/, which turns "untested module" into a lie.
+    const scanCorpus = tree.corpusOptions?.include
+      ? await loadCorpus(root, { maxFiles: tree.corpusOptions.maxFiles })
+      : corpus;
+    const findings = scanFindings(scanCorpus, tree, verification);
+    if (flags.json) {
+      process.stdout.write(JSON.stringify({ findings }) + '\n');
+      return 0;
+    }
+    if (findings.length === 0) {
+      log('No findings — this tree is clean by every deterministic check.');
+      return 0;
+    }
+    const md = findingsToMarkdown(findings, tree.name);
+    const out = flags.out ?? join(root, '.overstory', 'fixes.md');
+    await writeFile(out, md, 'utf8');
+    const sev = (n: number) => findings.filter((f) => f.severity === n).length;
+    log(`${findings.length} findings (${sev(1)} fix-first, ${sev(2)} soon, ${sev(3)} when convenient) — each rendered as a paste-ready, receipt-grounded prompt`);
+    for (const f of findings.slice(0, 10)) log(`  [${f.severity === 1 ? '!' : f.severity === 2 ? '~' : '·'}] ${f.title}`);
+    if (findings.length > 10) log(`  … ${findings.length - 10} more`);
+    log(`prompts: ${out}   (also in the app: overstory serve → Fixes)`);
     return 0;
   }
 

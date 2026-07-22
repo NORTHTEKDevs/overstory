@@ -12,7 +12,7 @@ export const explorerHtml = (
   meta: { owner: string; repo: string; sha: string; builtWith: string; verifiedAt: string },
 ): string => {
   const verification = snapshot ? verifyTree(tree, snapshot.corpus) : null;
-  const data = buildSiteData(tree, verification ?? verifyTree(tree, { root: '', files: new Map() }));
+  const data = buildSiteData(tree, verification ?? verifyTree(tree, { root: '', files: new Map() }), snapshot?.corpus);
   const base = generateSiteHtml(data, {
     ask: {
       cloneUrl: `https://github.com/${meta.owner}/${meta.repo}.git`,

@@ -146,6 +146,26 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:point
   * { transition:none !important; animation:none !important; }
 }
 
+/* ---- Fixes view ---- */
+.fix-btn { display:none; align-items:center; gap:6px; height:32px; padding:0 12px; border-radius:6px; border:1px solid var(--line); background:var(--bg1); color:var(--text2); font:500 12px var(--sans); }
+.fix-btn:hover { border-color:var(--accent); color:var(--accent); }
+.fix-btn.on { background:var(--bg3); color:var(--text); }
+body[data-fixes] .fix-btn { display:inline-flex; }
+.fix-btn .n { font:500 10.5px var(--mono); color:var(--accent); }
+.fix-intro { color:var(--text2); font-size:13px; max-width:70ch; margin-bottom:18px; }
+.fix-card { border:1px solid var(--line); border-radius:8px; background:var(--bg1); margin-bottom:10px; }
+.fix-card .fc-row { display:flex; align-items:flex-start; gap:10px; padding:12px 15px; }
+.fix-card .fc-sev { flex:none; margin-top:2px; font:500 10px var(--mono); padding:1px 7px; border-radius:999px; border:1px solid; }
+.fix-card .fc-sev.s1 { color:var(--missing); border-color:color-mix(in srgb, var(--missing) 40%, transparent); }
+.fix-card .fc-sev.s2 { color:var(--stale); border-color:color-mix(in srgb, var(--stale) 40%, transparent); }
+.fix-card .fc-sev.s3 { color:var(--text3); border-color:var(--line); }
+.fix-card .fc-main { flex:1; min-width:0; }
+.fix-card .fc-title { font:500 13.5px var(--sans); overflow-wrap:anywhere; }
+.fix-card .fc-detail { font-size:12.5px; color:var(--text2); margin-top:2px; overflow-wrap:anywhere; }
+.fix-card .fc-meta { font:400 10.5px var(--mono); color:var(--text3); margin-top:4px; }
+.fix-card .fc-copy { flex:none; padding:6px 12px; border:1px solid var(--line); border-radius:6px; font-size:12px; color:var(--accent); white-space:nowrap; }
+.fix-card .fc-copy:hover { border-color:var(--accent); }
+
 /* ---- Ask panel (registry pages only) ---- */
 .ask-open-btn { display:none; align-items:center; gap:7px; height:32px; padding:0 14px; border-radius:6px; background:var(--accent); color:#fff; font:500 12.5px var(--sans); }
 .ask-open-btn:hover { filter:brightness(1.08); }
@@ -206,6 +226,7 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
       <input id="searchInput" type="search" placeholder="Search claims" aria-label="Search claims">
       <kbd>/</kbd>
     </div>
+    <button class="fix-btn" id="fixesBtn"></button>
     <button class="ask-open-btn" id="askOpen">Ask this codebase</button>
   </header>
   <aside class="ask-panel" id="askPanel" aria-label="Ask this codebase" hidden>
@@ -335,6 +356,7 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
   function renderMain() {
     var main = document.getElementById('main');
     main.textContent = '';
+    if (state.fixes) { renderFixes(main); return; }
     if (state.query) { renderSearch(main); return; }
     var node = DATA.nodes[state.current];
 
@@ -505,9 +527,39 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
       if (DATA.nodes['dir:' + acc]) state.open['dir:' + acc] = true;
     }
   }
+  function renderFixes(main) {
+    main.appendChild(el('h1', 'node-title', 'Fix prompts'));
+    var intro = el('div', 'fix-intro');
+    intro.textContent = 'Paste-ready prompts for your coding agent, generated from this tree. Each one is grounded in receipts (the exact lines), scoped to one bounded change, and ends with machine-checkable acceptance criteria. One prompt per agent session; smallest diff wins.';
+    main.appendChild(intro);
+    var sevWord = { 1: 'fix first', 2: 'soon', 3: 'when convenient' };
+    (DATA.findings || []).forEach(function (f) {
+      var card = el('div', 'fix-card');
+      var row = el('div', 'fc-row');
+      row.appendChild(el('span', 'fc-sev s' + f.severity, sevWord[f.severity]));
+      var mainCol = el('div', 'fc-main');
+      mainCol.appendChild(el('div', 'fc-title', f.title));
+      mainCol.appendChild(el('div', 'fc-detail', f.detail));
+      mainCol.appendChild(el('div', 'fc-meta', f.kind + ' \\u00B7 ' + f.receipts + ' receipt' + (f.receipts === 1 ? '' : 's') + ' attached'));
+      row.appendChild(mainCol);
+      var copy = el('button', 'fc-copy', 'Copy prompt');
+      copy.addEventListener('click', function () {
+        navigator.clipboard.writeText(f.prompt).then(function () {
+          copy.textContent = 'Copied \\u2713';
+          setTimeout(function () { copy.textContent = 'Copy prompt'; }, 1500);
+        });
+      });
+      row.appendChild(copy);
+      card.appendChild(row);
+      main.appendChild(card);
+    });
+    if (!(DATA.findings || []).length) main.appendChild(el('div', 'empty', 'No findings — this tree is clean by every deterministic check.'));
+  }
+
   function go(id) {
     if (!DATA.nodes[id]) return;
     state.current = id;
+    state.fixes = false;
     openAncestors(id);
     renderTree();
     renderMain();
@@ -715,6 +767,20 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
         statusEl.textContent = '';
         answerHost.appendChild(el('div', 'ap-err', String(err && err.message ? err.message : err)));
       }).finally(function () { goBtn.disabled = false; });
+    });
+  })();
+
+  /* fixes toggle */
+  (function () {
+    var n = (DATA.findings || []).length;
+    if (!n) return;
+    document.body.setAttribute('data-fixes', '1');
+    var btn = document.getElementById('fixesBtn');
+    btn.innerHTML = 'Fixes <span class="n">' + n + '</span>';
+    btn.addEventListener('click', function () {
+      state.fixes = !state.fixes;
+      btn.classList.toggle('on', state.fixes);
+      renderMain();
     });
   })();
 

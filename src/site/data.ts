@@ -1,4 +1,6 @@
-import type { Tree, TreeVerification, Verdict } from '../core/types.js';
+import type { CorpusSnapshot, Tree, TreeVerification, Verdict } from '../core/types.js';
+import { scanFindings } from '../fix/scan.js';
+import { findingToPrompt } from '../fix/prompts.js';
 
 export interface SiteSpan {
   file: string;
@@ -32,6 +34,16 @@ export interface SiteNode {
   total: number;
 }
 
+export interface SiteFinding {
+  kind: string;
+  severity: 1 | 2 | 3;
+  title: string;
+  detail: string;
+  receipts: number;
+  /** The complete paste-ready prompt (composed server-side, spec shape). */
+  prompt: string;
+}
+
 export interface SiteData {
   name: string;
   builtAt: string;
@@ -41,12 +53,16 @@ export interface SiteData {
   total: number;
   root: string;
   nodes: Record<string, SiteNode>;
+  /** Present when a corpus was available at render time (fix prompts need the code). */
+  findings?: SiteFinding[];
 }
 
 const SEVERITY: Record<Verdict, number> = { VERIFIED: 0, STALE: 1, OUT_OF_CORPUS: 2, UNGROUNDED: 3 };
 
-/** Flatten the tree + verification into the self-contained model the explorer embeds. */
-export const buildSiteData = (tree: Tree, verification: TreeVerification): SiteData => {
+/** Flatten the tree + verification into the self-contained model the explorer embeds.
+ * With a corpus, also runs the deterministic finding scanner so the explorer can offer
+ * paste-ready, receipt-grounded fix prompts. */
+export const buildSiteData = (tree: Tree, verification: TreeVerification, corpus?: CorpusSnapshot): SiteData => {
   const nodes: Record<string, SiteNode> = {};
   let verifiedTotal = 0;
   let claimTotal = 0;
@@ -104,6 +120,17 @@ export const buildSiteData = (tree: Tree, verification: TreeVerification): SiteD
   };
   worstOf(tree.root);
 
+  const findings = corpus
+    ? scanFindings(corpus, tree, verification).map((f, i) => ({
+        kind: f.kind,
+        severity: f.severity,
+        title: f.title,
+        detail: f.detail,
+        receipts: f.receipts.length,
+        prompt: findingToPrompt(f, i + 1),
+      }))
+    : undefined;
+
   return {
     name: tree.name,
     builtAt: tree.builtAt,
@@ -113,5 +140,6 @@ export const buildSiteData = (tree: Tree, verification: TreeVerification): SiteD
     total: claimTotal,
     root: tree.root,
     nodes,
+    ...(findings ? { findings } : {}),
   };
 };

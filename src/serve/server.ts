@@ -32,6 +32,8 @@ const verifyBodySchema = z.object({
 interface LoadedState {
   tree: Tree;
   corpus: CorpusSnapshot;
+  /** Unscoped corpus for the finding scanner (a src/** build scope cannot see tests/). */
+  scanCorpus: CorpusSnapshot;
   verification: TreeVerification;
   treeMtimeMs: number;
   corpusAt: number;
@@ -89,8 +91,11 @@ export const createOverstoryHttpServer = (root: string, opts: ServeOptions): Ser
     const tree = await loadTree(treePath(root));
     if (!tree) return null;
     const corpus = await loadCorpus(root, tree.corpusOptions ?? {});
+    const scanCorpus = tree.corpusOptions?.include
+      ? await loadCorpus(root, { maxFiles: tree.corpusOptions.maxFiles })
+      : corpus;
     const verification = verifyTree(tree, corpus);
-    cached = { tree, corpus, verification, treeMtimeMs: mtimeMs, corpusAt: now };
+    cached = { tree, corpus, scanCorpus, verification, treeMtimeMs: mtimeMs, corpusAt: now };
     return cached;
   };
 
@@ -124,7 +129,7 @@ export const createOverstoryHttpServer = (root: string, opts: ServeOptions): Ser
       if (route === 'GET /api/tree') {
         const state = await load();
         if (!state) return sendJson(res, 404, { error: 'No tree found. Run: overstory build' });
-        return sendJson(res, 200, buildSiteData(state.tree, state.verification));
+        return sendJson(res, 200, buildSiteData(state.tree, state.verification, state.scanCorpus));
       }
 
       if (route === 'GET /api/threads') return sendJson(res, 200, await threads.list());
