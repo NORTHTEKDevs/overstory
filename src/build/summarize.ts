@@ -108,6 +108,10 @@ export const summarizeFile = async (
 ): Promise<SummarizeResult> => {
   const entry = corpus.files.get(file);
   if (!entry) throw new Error(`summarizeFile: ${file} not in corpus`);
+  // An empty (or whitespace-only) file has nothing to claim. Emitting a claim over empty
+  // content would be voided by the gate anyway (empty receipts are forgeries by definition)
+  // — so don't create it. The explorer's "file is empty" state covers the rendering.
+  if (entry.lines.every((l) => l.trim() === '')) return { claims: [], degraded: false };
   const spans = chunkFile(file, entry.lines.join('\n'));
   const out: Omit<Claim, 'id'>[] = [];
   let degraded = false;

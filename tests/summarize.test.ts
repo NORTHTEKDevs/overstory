@@ -120,6 +120,15 @@ describe('summarizeFile', () => {
     expect(claims.every((c) => c.faithfulness === 'supported')).toBe(true);
   });
 
+  it('empty and whitespace-only files produce ZERO claims (never a voidable one) — live bug from NORTHTEKDevs/rain __init__.py files', async () => {
+    const corpus = corpusOf({ 'pkg/__init__.py': '', 'blank.txt': '  \n\t\n' });
+    for (const file of ['pkg/__init__.py', 'blank.txt']) {
+      const { claims, degraded } = await summarizeFile(null, file, corpus, 'p');
+      expect(claims).toEqual([]);
+      expect(degraded).toBe(false);
+    }
+  });
+
   it('extractive path when provider is null', async () => {
     const corpus = corpusOf({ 'src/a.ts': FILE });
     const { claims, degraded } = await summarizeFile(null, 'src/a.ts', corpus, 'p');
