@@ -9,21 +9,39 @@ export interface AskPanelOptions {
   repoLabel: string;
 }
 
+export interface ShareMetaOptions {
+  /** Absolute canonical URL of this page (og:url). */
+  url: string;
+  /** e.g. "94% of 2,477 statements verified against the code right now". */
+  status: string;
+}
+
 /** Render the self-contained explorer. One HTML file, zero external scripts; data embedded
  * as JSON; fonts degrade gracefully offline (air-gapped is a product promise).
  * `ask` (registry pages only) adds the Ask panel: run-locally instructions plus browser-side
  * BYO-key ask — the visitor's key calls Anthropic directly from their browser; the server
  * never sees keys, questions, or answers. */
-export const generateSiteHtml = (data: SiteData, opts: { ask?: AskPanelOptions } = {}): string => {
+export const generateSiteHtml = (data: SiteData, opts: { ask?: AskPanelOptions; share?: ShareMetaOptions } = {}): string => {
   const json = JSON.stringify(data).replace(/</gu, '\\u003c');
   const askJson = JSON.stringify(opts.ask ?? null).replace(/</gu, '\\u003c');
+  const shareMeta = opts.share
+    ? `
+<meta property="og:title" content="${esc(data.name)} — a verified map of this codebase">
+<meta property="og:description" content="${esc(opts.share.status)} Every statement links to the exact lines that prove it — checked mechanically, not just displayed.">
+<meta property="og:url" content="${esc(opts.share.url)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OVERSTORY">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${esc(data.name)} — verified codebase map">
+<meta name="twitter:description" content="${esc(opts.share.status)}">`
+    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(data.name)} — OVERSTORY</title>
-<meta name="description" content="Knowledge tree for ${esc(data.name)}: every claim carries a verifiable receipt.">
+<meta name="description" content="Knowledge tree for ${esc(data.name)}: every claim carries a verifiable receipt.">${shareMeta}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -146,6 +164,15 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:point
   * { transition:none !important; animation:none !important; }
 }
 
+/* ---- first-visit welcome ---- */
+.welcome { border:1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); background:color-mix(in srgb, var(--accent) 6%, var(--bg1)); border-radius:10px; padding:16px 18px; margin-bottom:22px; }
+.welcome .w-title { font:500 15px var(--serif); margin-bottom:6px; }
+.welcome .w-body { font-size:13px; color:var(--text2); line-height:1.6; max-width:72ch; }
+.welcome .w-body b { color:var(--text); font-weight:500; }
+.welcome .w-row { display:flex; gap:14px; align-items:center; margin-top:10px; }
+.welcome .w-got { padding:6px 14px; border-radius:6px; background:var(--accent); color:#fff; font:500 12.5px var(--sans); }
+.welcome .w-num { font:500 12px var(--mono); color:var(--accent); }
+
 /* ---- Fixes view ---- */
 .fix-btn { display:none; align-items:center; gap:6px; height:32px; padding:0 12px; border-radius:6px; border:1px solid var(--line); background:var(--bg1); color:var(--text2); font:500 12px var(--sans); }
 .fix-btn:hover { border-color:var(--accent); color:var(--accent); }
@@ -240,7 +267,7 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
   </aside>
   <div class="frame">
     <nav class="rail" id="rail" aria-label="Knowledge tree">
-      <div class="rail-hint">CANOPY — trust flows up</div>
+      <div class="rail-hint" title="A green dot means everything inside checks out against the code; amber or red means something in that folder needs attention.">TRUST MAP — every dot is checked against the code</div>
       <div id="treeRoot" role="tree"></div>
     </nav>
     <main class="main" id="main" tabindex="-1"></main>
@@ -353,9 +380,32 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
     return chain;
   }
 
+  function welcomeCard() {
+    var pct = Math.round(DATA.freshness * 100);
+    var card = el('div', 'welcome');
+    card.appendChild(el('div', 'w-title', 'You\\u2019re looking at a verified map of ' + DATA.name));
+    var body = el('div', 'w-body');
+    body.innerHTML = 'A machine read this codebase and wrote it up as short statements \\u2014 then <b>checked every statement against the actual code</b>. Click any row to unfold its <b>receipt</b>: the exact lines it came from. Green means it still checks out; amber means the code changed since. Nothing here is taken on faith \\u2014 including from us.';
+    card.appendChild(body);
+    var row = el('div', 'w-row');
+    var got = el('button', 'w-got', 'Got it');
+    got.addEventListener('click', function () {
+      try { localStorage.setItem('overstory-welcomed', '1'); } catch (e) {}
+      state.welcomed = true;
+      renderMain();
+    });
+    row.appendChild(got);
+    row.appendChild(el('span', 'w-num', pct + '% of ' + DATA.total + ' statements verify right now'));
+    card.appendChild(row);
+    return card;
+  }
+  try { state.welcomed = !!localStorage.getItem('overstory-welcomed'); } catch (e) { state.welcomed = true; }
+
   function renderMain() {
     var main = document.getElementById('main');
     main.textContent = '';
+    var hosted = document.body.hasAttribute('data-ask');
+    if (hosted && !state.welcomed && !state.fixes && !state.query) main.appendChild(welcomeCard());
     if (state.fixes) { renderFixes(main); return; }
     if (state.query) { renderSearch(main); return; }
     var node = DATA.nodes[state.current];

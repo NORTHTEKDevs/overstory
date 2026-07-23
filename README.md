@@ -2,6 +2,16 @@
 
 **A knowledge tree of your codebase where every claim carries a receipt.**
 
+> **30 seconds, no jargon:** AI tools sound exactly as confident when they're wrong as when
+> they're right. OVERSTORY reads your codebase, writes it up as short statements, and then
+> **checks every statement against the actual code** — click any one to see the exact lines
+> it came from. When the code changes, the affected statements flip to "stale" instead of
+> quietly becoming lies. Ask questions and get answers where every sentence carries a
+> checkable receipt; statements that can't be verified are withheld and say so. All of it
+> runs on your machine — your code never leaves.
+>
+> Try it: `npx @northtek/overstory build && npx @northtek/overstory serve`
+
 OVERSTORY turns any repo or docs folder into an explorable, hierarchical map — file to module
 to system — in which every statement is an atomic claim citing the exact source lines that
 support it. Citations are verified mechanically, not displayed decoratively: a claim whose

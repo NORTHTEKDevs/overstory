@@ -49,6 +49,13 @@ header .right a:hover{color:var(--accent)}
 .publish p{color:var(--text2);max-width:60ch}
 .publish pre{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px;font:400 13px/1.8 var(--mono);overflow-x:auto}
 .publish .badge-demo{margin-top:14px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text2)}
+.faq{margin:64px 0 0}
+.faq h2{font:450 24px/1.3 var(--serif);margin-bottom:16px}
+.faq details{border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-bottom:8px;box-shadow:var(--shadow)}
+.faq summary{cursor:pointer;padding:13px 16px;font:500 14px var(--sans);list-style:none;display:flex;align-items:center;gap:10px}
+.faq summary::before{content:"▸";color:var(--accent);font-size:11px;transition:transform 120ms}
+.faq details[open] summary::before{transform:rotate(90deg)}
+.faq .a{padding:0 16px 14px 37px;color:var(--text2);font-size:13.5px;line-height:1.65;max-width:72ch}
 footer{border-top:1px solid var(--line);margin-top:70px;padding:22px 0 40px;display:flex;gap:16px;color:var(--text3);font-size:12.5px}
 footer a{color:var(--text2)}
 @media (max-width:720px){.steps{grid-template-columns:1fr}.hero h1{font-size:32px}}
@@ -101,6 +108,30 @@ npx @northtek/overstory publish     # confirms the registry can verify it
     <img src="/badge/gh/NORTHTEKDevs/overstory.svg" alt="overstory: verified badge" height="20">
     <span>← live, recomputed from the actual gate</span>
   </div>
+</section>
+
+<section class="faq">
+  <h2>Honest questions, honest answers</h2>
+  <details open>
+    <summary>What am I actually looking at when I open a tree?</summary>
+    <div class="a">A machine read the repo and wrote it up as short statements — then checked every statement against the actual code. Click any row to unfold its <b>receipt</b>: the exact lines it came from. Green means it still checks out. Amber means the code changed since it was written. That's the whole idea: nothing is taken on faith.</div>
+  </details>
+  <details>
+    <summary>How is this different from asking ChatGPT or using an AI wiki?</summary>
+    <div class="a">Those tools sound exactly as confident when they're wrong as when they're right, and their citations are displayed, not checked. Here, every citation is verified mechanically against the code — and statements that can't be verified are withheld and labeled, never blended in. When the code moves on, the page says so instead of quietly going stale.</div>
+  </details>
+  <details>
+    <summary>Do you store my code?</summary>
+    <div class="a">No — and not as a promise, as an architecture. This site has no database. Public repos are fetched from GitHub, checked in memory, and shown; nothing is kept. Published trees live in <i>your</i> repo as a file you control. Private code never touches this site at all: the full experience runs on your own machine with <code>npx @northtek/overstory serve</code>.</div>
+  </details>
+  <details>
+    <summary>Does "verified" mean it's true?</summary>
+    <div class="a">It means something precise and honest: the cited lines exist and haven't changed, checked by hashing — and every statement is one click from its evidence so you can judge it yourself. A second layer (an adversarial critique at build time) checks whether the lines actually support each statement, and statements that fail stay visible and flagged. We never claim more than we can prove — that's the product.</div>
+  </details>
+  <details>
+    <summary>What does it cost?</summary>
+    <div class="a">The tool is free and open source (Apache-2.0). This site runs no AI and stores nothing, so it's free to use. If you ask questions with your own API key, you pay your AI provider directly — typically about a cent a question. Building rich trees with a local model via Ollama costs nothing at all.</div>
+  </details>
 </section>
 
 <footer>

@@ -31,6 +31,7 @@ export const GET = async (req: Request, ctx: { params: Promise<{ owner: string; 
           repo,
           sha: snapshot.sha,
           builtWith: `published by the repo (${published.source})`,
+          origin: new URL(req.url).origin,
           verifiedAt: 'just now',
         }),
       );
@@ -42,6 +43,7 @@ export const GET = async (req: Request, ctx: { params: Promise<{ owner: string; 
         repo,
         sha: snapshot.sha,
         builtWith: 'extractive (instant)',
+        origin: new URL(req.url).origin,
         verifiedAt: 'just now',
       }),
       200,

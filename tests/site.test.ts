@@ -70,6 +70,22 @@ describe('generateSiteHtml', () => {
     for (const src of scripts) expect(() => new Function(src)).not.toThrow();
   });
 
+  it('share meta renders og/twitter tags only when share options are given', () => {
+    expect(html).not.toContain('og:title');
+    const withShare = generateSiteHtml(data, {
+      ask: { cloneUrl: 'https://github.com/o/r.git', repoLabel: 'r' },
+      share: { url: 'https://overstory.northtek.io/gh/o/r', status: '100% of 10 statements verified against the code right now.' },
+    });
+    expect(withShare).toContain('og:title');
+    expect(withShare).toContain('verified against the code right now');
+    expect(withShare).toContain('https://overstory.northtek.io/gh/o/r');
+    expect(withShare).toContain('welcome'); // first-visit explainer ships with hosted pages
+    expect(withShare).toContain('TRUST MAP');
+    for (const m of [...withShare.matchAll(/<script>([\s\S]*?)<\/script>/gu)]) {
+      expect(() => new Function(m[1])).not.toThrow();
+    }
+  });
+
   it('ask panel is absent by default (offline export) and present with registry options', () => {
     expect(html).toContain('"overstory-ask-config" type="application/json">null<');
     const withAsk = generateSiteHtml(data, { ask: { cloneUrl: 'https://github.com/o/r.git', repoLabel: 'r' } });

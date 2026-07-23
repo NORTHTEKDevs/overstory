@@ -9,17 +9,23 @@ const esc = (s: string): string =>
 export const explorerHtml = (
   tree: Tree,
   snapshot: GithubSnapshot | null,
-  meta: { owner: string; repo: string; sha: string; builtWith: string; verifiedAt: string },
+  meta: { owner: string; repo: string; sha: string; builtWith: string; verifiedAt: string; origin?: string },
 ): string => {
   const verification = snapshot ? verifyTree(tree, snapshot.corpus) : null;
   const data = buildSiteData(tree, verification ?? verifyTree(tree, { root: '', files: new Map() }), snapshot?.corpus);
+  const pct = Math.round(data.freshness * 100);
   const base = generateSiteHtml(data, {
     ask: {
       cloneUrl: `https://github.com/${meta.owner}/${meta.repo}.git`,
       repoLabel: meta.repo,
     },
+    share: meta.origin
+      ? {
+          url: `${meta.origin}/gh/${meta.owner}/${meta.repo}`,
+          status: `${pct}% of ${data.total.toLocaleString('en-US')} statements verified against the code right now.`,
+        }
+      : undefined,
   });
-  const pct = Math.round(data.freshness * 100);
   const bar = `
 <div style="position:fixed;top:0;left:0;right:0;z-index:99;display:flex;gap:14px;align-items:center;padding:8px 16px;background:var(--bg1);border-bottom:1px solid var(--line);font:500 12px 'JetBrains Mono',monospace;">
   <a href="/" style="color:var(--accent);text-decoration:none;font-family:Fraunces,Georgia,serif;letter-spacing:.12em;font-size:13px;">OVERSTORY</a>
