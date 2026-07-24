@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 
 const execFileP = promisify(execFile);
 
-export const DEFAULT_REGISTRY = 'https://overstory.northtek.io';
+export const DEFAULT_REGISTRY = process.env.OVERSTORY_REGISTRY ?? 'https://overstory-virid.vercel.app';
 
 /** Parse owner/repo out of any common GitHub remote form. */
 export const parseGithubRemote = (url: string): { owner: string; repo: string } | null => {
