@@ -1,7 +1,7 @@
 # OVERSTORY Registry — Design (v3 surface)
 
-Date: 2026-07-21  Status: LOCKED (client directive: "connect to GitHub, upload local codebase,
-it verifies it" — sharpened to the verified-registry architecture below)
+Status: implemented, in preview. Design note for the hosted registry surface described in the
+README. The local CLI is the product; this documents how the optional hosted verifier works.
 
 ## One line
 

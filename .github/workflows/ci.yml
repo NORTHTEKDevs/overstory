@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: typecheck
+        run: npm run typecheck
+      - name: tests
+        run: npm test
+      - name: build
+        run: npm run build
+      - name: verify the repo's own claims against the code
+        # Dogfooding, and a real gate: if a change stales the committed tree, this fails.
+        # Refresh it with `npx overstory build` and commit .overstory/tree.json.
+        run: node dist/cli/index.js verify .
+
+  package:
+    name: packed tarball installs and runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm pack
+      # An npm package can pass every test in the repo and still be broken on install.
+      # This installs the actual artifact into a clean tree and runs its bin.
+      - name: install from tarball and exercise the CLI
+        run: |
+          mkdir -p /tmp/smoke/src && cd /tmp/smoke
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/northtek-overstory-*.tgz
+          test "$(./node_modules/.bin/overstory --version)" = "$(node -p "require('$GITHUB_WORKSPACE/package.json').version")"
+          printf 'export const add = (a, b) => a + b;\n' > src/math.js
+          printf '# Demo\n\nExposes an add function.\n' > README.md
+          ./node_modules/.bin/overstory build . --provider none
+          ./node_modules/.bin/overstory verify .

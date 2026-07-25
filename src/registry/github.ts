@@ -24,6 +24,10 @@ export interface GithubSnapshot {
 export interface FetchOptions {
   ref?: string; // default 'HEAD' (default branch)
   maxTarballBytes?: number;
+  /** Ceiling on the DECOMPRESSED tarball. A compressed-size cap alone does not bound
+   * memory: gzip ratios above 1000:1 are trivial to construct, so a repo well under the
+   * compressed cap can still expand to gigabytes. */
+  maxUncompressedBytes?: number;
   maxFiles?: number;
   maxFileBytes?: number;
   fetchImpl?: typeof fetch;
@@ -74,12 +78,63 @@ export const readTar = (tar: Buffer): TarEntry[] => {
 
 const looksBinary = (buf: Buffer): boolean => buf.subarray(0, 8000).includes(0);
 
+/** Decompress with a hard output ceiling so a gzip bomb fails fast and loudly instead of
+ * exhausting the function's memory. */
+export const gunzipUnderCap = (tarball: Buffer, maxOutputLength: number): Buffer => {
+  try {
+    return gunzipSync(tarball, { maxOutputLength });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException | undefined)?.code;
+    const message = err instanceof Error ? err.message : String(err);
+    if (code === 'ERR_BUFFER_TOO_LARGE' || /larger than|maxOutputLength/iu.test(message)) {
+      throw new Error(
+        `repo expands past the registry's ${Math.round(maxOutputLength / 1e6)}MB uncompressed cap`,
+      );
+    }
+    throw err;
+  }
+};
+
+/** Read a response body against a running byte ceiling, cancelling the transfer the moment
+ * it is exceeded. Buffering the whole body and checking `.length` afterwards would let a
+ * hostile repo exhaust memory before the check ever ran. */
+const readUnderCap = async (res: Response, cap: number): Promise<Buffer> => {
+  if (!res.body) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > cap) throw new Error(tarballTooLarge(cap));
+    return buf;
+  }
+  const reader = res.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error(tarballTooLarge(cap));
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+};
+
+const tarballTooLarge = (cap: number): string =>
+  `repo too large for the registry (tarball exceeds the ${Math.round(cap / 1e6)}MB cap)`;
+
+/** GitHub owners are <=39 chars and repos <=100; neither may contain a path segment or a
+ * traversal sequence. Validated before the URL is built, not after. */
+const validSegment = (segment: string): boolean =>
+  /^[\w.-]{1,100}$/u.test(segment) && !segment.includes('..') && segment !== '.';
+
 /** Turn a GitHub codeload tarball into an in-memory corpus. The tarball's root directory
  * is `{repo}-{sha}/` — the sha comes free, no API call needed. */
 export const snapshotFromTarball = (tarball: Buffer, ref: string, opts: FetchOptions = {}): GithubSnapshot => {
   const maxFiles = opts.maxFiles ?? 5_000;
   const maxFileBytes = opts.maxFileBytes ?? 1_000_000;
-  const entries = readTar(gunzipSync(tarball));
+  const maxUncompressedBytes = opts.maxUncompressedBytes ?? 400_000_000;
+  const entries = readTar(gunzipUnderCap(tarball, maxUncompressedBytes));
   if (entries.length === 0) throw new Error('empty tarball');
 
   const rootDir = entries[0].name.split('/')[0];
@@ -122,7 +177,7 @@ export const fetchGithubSnapshot = async (
   repo: string,
   opts: FetchOptions = {},
 ): Promise<GithubSnapshot> => {
-  if (!/^[\w.-]+$/u.test(owner) || !/^[\w.-]+$/u.test(repo)) throw new Error('invalid owner/repo');
+  if (!validSegment(owner) || !validSegment(repo)) throw new Error('invalid owner/repo');
   const ref = opts.ref ?? 'HEAD';
   if (!/^[\w][\w./-]*$/u.test(ref) || ref.includes('..')) throw new Error('invalid ref');
   const fetchImpl = opts.fetchImpl ?? fetch;
@@ -134,9 +189,6 @@ export const fetchGithubSnapshot = async (
   });
   if (res.status === 404) throw new Error(`GitHub repo not found (or private): ${owner}/${repo}@${ref}`);
   if (!res.ok) throw new Error(`GitHub tarball fetch failed: HTTP ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > maxTarballBytes) {
-    throw new Error(`repo too large for the registry (${Math.round(buf.length / 1e6)}MB tarball; cap ${Math.round(maxTarballBytes / 1e6)}MB)`);
-  }
+  const buf = await readUnderCap(res, maxTarballBytes);
   return snapshotFromTarball(buf, ref, opts);
 };

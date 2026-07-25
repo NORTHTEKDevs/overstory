@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a capability OVERSTORY should have
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The roadmap in the README lists what has been deliberately deferred (embedding
+        search, AST-precise chunking, watch mode, a stale-docs CI bot, team trees). If your
+        request is one of those, a comment describing your use case is more useful than a
+        new issue.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that the tool makes hard or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: >
+        What should happen instead. If it affects verification, say what the new verdict
+        should be and what evidence would justify it — the gate is fail-closed by design and
+        changes to it need to preserve that.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, and why they were not enough.
+    validations:
+      required: false

@@ -1,6 +1,14 @@
 # OVERSTORY
 
+[![CI](https://github.com/NORTHTEKDevs/overstory/actions/workflows/ci.yml/badge.svg)](https://github.com/NORTHTEKDevs/overstory/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@northtek/overstory)](https://www.npmjs.com/package/@northtek/overstory)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![overstory](https://overstory-virid.vercel.app/badge/gh/NORTHTEKDevs/overstory.svg)](https://overstory-virid.vercel.app/gh/NORTHTEKDevs/overstory)
+
 **A knowledge tree of your codebase where every claim carries a receipt.**
+
+> The last badge is this repository's own claims, re-verified against this repository's
+> current code every time you load it. If it drops below 100%, the docs drifted.
 
 > **30 seconds, no jargon:** AI tools sound exactly as confident when they're wrong as when
 > they're right. OVERSTORY reads your codebase, writes it up as short statements, and then
@@ -80,7 +88,7 @@ There's an experimental zero-storage registry that can show verified trees of pu
 repos and re-check published trees against the live code (the registry stores nothing —
 your repo is the database). It's in quiet preview and not the point of v1: the product is
 the local tool. `overstory publish` targets it if you want to try it; details in
-docs/plans/2026-07-21-registry-design.md.
+[docs/registry-design.md](docs/registry-design.md).
 
 ## MCP: notarize your agent's answers
 

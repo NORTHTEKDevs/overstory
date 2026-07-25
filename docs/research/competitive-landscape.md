@@ -4,11 +4,13 @@
 - What it does: launched May 5, 2025 as "the free public version of Devin Wiki and Devin Search." Swap `github.com` for `deepwiki.com` on any public repo URL to get an auto-generated wiki (architecture diagrams, module summaries, Q&A chat). Indexed 50,000+ top public repos at launch (cognition.com/blog/deepwiki). MCP server available for agent tool-use (mcp.directory/blog/deepwiki-mcp-complete-guide-2026).
 - Pricing/deployment: free for public repos, cloud-only SaaS (Cognition-hosted). Private-repo wiki (Devin Wiki) requires a paid Devin account — Devin plans run Free/Pro/Max/Teams/Enterprise, Max ~$200/mo + per-seat fees (devin.ai/pricing).
 - Citations: NOT verified/clickable at the line level. Answers include prose + some file/code links but no dedicated per-claim citation panel. mcp.directory notes "file-citation pressure is a decent hallucination check" — i.e., users have to actively probe it to catch bad citations, they aren't structurally enforced.
-- Top complaints (2025-2026, real):
-  - HN launch thread (news.ycombinator.com/item?id=45002092, Aug 2025): maintainer reports DeepWiki "hallucinating pretty convincingly... given the need to confirm whatever an AI says for correctness... it's hard for me to say... it would have been faster [than reading the code]."
-  - LLVM test case (linked from same thread): results "ranged from incomplete to just plain incorrect."
-  - LibreOffice case: DeepWiki listed Buck as LibreOffice's primary build system — factually wrong (documented on the HN thread, corroborated by mcp.directory 2026 writeup).
-  - blopker.com/writing/12-deepwiki (Nov 2025), a maintainer's post titled "DeepWiki and the loss of control": calls it "a fractal of misinformation and abusive design" — DeepWiki hallucinated an unpublished/broken VS Code extension as "the main way to use" his project, and a Cognition-affiliated commenter defended the AI's hallucination over the actual maintainer's correction. Core complaint: DeepWiki republishes wrong info about a project without the maintainer's consent or oversight, and it currently ranks/appears alongside official docs.
+- Reported accuracy issues (2025-2026). These are cited because they define the problem
+  OVERSTORY exists to address — unverified citations over auto-generated docs — not as a
+  judgement of the product or its authors:
+  - HN launch thread (news.ycombinator.com/item?id=45002092, Aug 2025): a maintainer reports output "hallucinating pretty convincingly," and that confirming correctness cost more time than reading the code directly.
+  - LLVM test case (linked from the same thread): results "ranged from incomplete to just plain incorrect."
+  - LibreOffice case: Buck listed as the primary build system, which is factually wrong (documented on the HN thread, corroborated by the mcp.directory 2026 writeup).
+  - blopker.com/writing/12-deepwiki (Nov 2025): a maintainer documents generated docs presenting an unpublished extension as the main way to use his project. The structural complaint is the transferable one — generated docs get republished about a project without the maintainer's oversight, and rank alongside official docs.
   - Coverage/freshness gap: un-indexed repos get sparse first answers; re-indexing is scheduled not real-time, so fast-moving repos show stale info.
 
 ## Greptile

@@ -1,0 +1,49 @@
+name: Bug report
+description: Something behaves differently than documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For anything security-relevant — especially a claim reported `VERIFIED` whose cited
+        text does not match the source — please email info@northtek.io instead of opening a
+        public issue. See SECURITY.md.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got.
+      placeholder: |
+        $ overstory verify .
+        expected: exit 0
+        got: 40% verified, stale evidence in src/x.ts (the file is unchanged)
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: >
+        A public repo or a minimal folder that triggers it is the fastest path to a fix.
+        If the tree is involved, note whether it was built with the ollama, anthropic, or
+        extractive provider.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "Output of `overstory --version`, or the npm version installed."
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Node version
+      placeholder: "Windows 11, Node 24.13.0"
+    validations:
+      required: true

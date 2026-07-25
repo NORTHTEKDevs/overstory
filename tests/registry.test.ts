@@ -68,6 +68,43 @@ describe('github tarball reader', () => {
     await expect(fetchGithubSnapshot('ok', 'x', { ref: '../../etc' })).rejects.toThrow(/invalid/u);
   });
 
+  it('rejects traversal and over-long segments in owner/repo', async () => {
+    const unreachable = (async () => {
+      throw new Error('network was reached — validation did not run first');
+    }) as unknown as typeof fetch;
+    for (const [owner, repo] of [['..', 'r'], ['o', '..'], ['.', 'r'], ['o', 'a'.repeat(101)]]) {
+      await expect(fetchGithubSnapshot(owner, repo, { fetchImpl: unreachable })).rejects.toThrow(/invalid/u);
+    }
+  });
+
+  it('refuses a gzip bomb: passes the compressed cap, dies on the uncompressed one', async () => {
+    // 60MB of zeros compresses to ~60KB — comfortably under any sane compressed-size cap.
+    const bomb = gzipSync(Buffer.alloc(60_000_000));
+    expect(bomb.length).toBeLessThan(1_000_000);
+    const fetchImpl = (async () => new Response(bomb, { status: 200 })) as typeof fetch;
+    await expect(
+      fetchGithubSnapshot('o', 'r', { fetchImpl, maxUncompressedBytes: 1_000_000 }),
+    ).rejects.toThrow(/uncompressed cap/u);
+  });
+
+  it('aborts an oversized transfer mid-stream instead of buffering it whole', async () => {
+    let delivered = 0;
+    const chunk = new Uint8Array(64_000);
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        delivered += chunk.byteLength;
+        if (delivered > 4_000_000) return controller.close();
+        controller.enqueue(chunk);
+      },
+    });
+    const fetchImpl = (async () => new Response(body, { status: 200 })) as typeof fetch;
+    await expect(fetchGithubSnapshot('o', 'r', { fetchImpl, maxTarballBytes: 500_000 })).rejects.toThrow(
+      /too large/u,
+    );
+    // Cancelled early: nowhere near the full 4MB was pulled through.
+    expect(delivered).toBeLessThan(2_000_000);
+  });
+
   it('fetch uses codeload and enforces the size cap (mocked)', async () => {
     const tarball = makeTarball(FILES);
     const fetchImpl = (async (url: RequestInfo | URL) => {

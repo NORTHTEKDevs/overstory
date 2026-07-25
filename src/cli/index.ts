@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildTree, verifyExisting } from '../build/builder.js';
 import { loadCorpus } from '../core/corpus.js';
 import { loadTree, treePath } from '../core/store.js';
@@ -35,7 +36,26 @@ Options:
   --out <file>              Output path for site
   --port <n>                Port for serve (default 7433)
   --json                    Machine-readable output
+  --version, -v             Print the installed version
+  --help, -h                Show this help
 `;
+
+/** Read the version from the shipped package.json. Resolved relative to this module so it
+ * is correct whether running from dist/ or from source. */
+const packageVersion = (): string => {
+  for (const up of ['../../package.json', '../../../package.json']) {
+    try {
+      const path = fileURLToPath(new URL(up, import.meta.url));
+      const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+      if (parsed !== null && typeof parsed === 'object' && 'version' in parsed) {
+        return String((parsed as { version: unknown }).version);
+      }
+    } catch {
+      // try the next candidate
+    }
+  }
+  return 'unknown';
+};
 
 interface Flags {
   provider: string;
@@ -71,6 +91,7 @@ const parseArgs = (argv: string[]): { cmd: string; positional: string[]; flags: 
     else if (a === '--out') flags.out = argv[++i];
     else if (a === '--port') flags.port = numFlag(argv[++i], '--port');
     else if (a === '--help' || a === '-h') positional.push('help');
+    else if (a === '--version' || a === '-v') positional.unshift('version');
     else positional.push(a);
   }
   const cmd = positional.shift() ?? 'help';
@@ -88,6 +109,11 @@ const main = async (): Promise<number> => {
   const { cmd, positional, flags } = parseArgs(process.argv.slice(2));
   const rootArg = positional[cmd === 'ask' ? 1 : 0];
   const root = resolve(rootArg ?? '.');
+
+  if (cmd === 'version') {
+    process.stdout.write(`${packageVersion()}\n`);
+    return 0;
+  }
 
   if (cmd === 'help') {
     process.stdout.write(HELP);
