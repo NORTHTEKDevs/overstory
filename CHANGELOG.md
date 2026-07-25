@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-25
+
+### Added
+
+- `overstory --version` (and `-v`). Previously both fell through to the help text.
+
 ### Security
 
 - **Registry: bounded decompression.** `fetchGithubSnapshot` capped the *compressed* tarball
@@ -44,5 +50,6 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/NORTHTEKDevs/overstory/releases/tag/v0.1.0
