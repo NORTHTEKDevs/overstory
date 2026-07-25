@@ -17,3 +17,4 @@ web/start.log
 web/next-env.d.ts
 
 .vercel
+*.tgz
