@@ -22,7 +22,10 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci
+      # Not `npm ci`: @rolldown/binding-wasm32-wasi pulls platform-specific @emnapi
+      # packages, and a lockfile authored on one OS cannot enumerate another OS's
+      # resolution of them. `npm install` resolves per-platform against the same lock.
+      - run: npm install --no-audit --no-fund
       - name: typecheck
         run: npm run typecheck
       - name: tests
@@ -43,7 +46,10 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
+      # Not `npm ci`: @rolldown/binding-wasm32-wasi pulls platform-specific @emnapi
+      # packages, and a lockfile authored on one OS cannot enumerate another OS's
+      # resolution of them. `npm install` resolves per-platform against the same lock.
+      - run: npm install --no-audit --no-fund
       - run: npm pack
       # An npm package can pass every test in the repo and still be broken on install.
       # This installs the actual artifact into a clean tree and runs its bin.
