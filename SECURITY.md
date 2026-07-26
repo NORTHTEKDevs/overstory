@@ -6,7 +6,8 @@ Email **info@northtek.io** with "OVERSTORY security" in the subject. Please do n
 public issue for an unfixed vulnerability.
 
 Include what you need to reproduce it: the command or request, the repo or input that
-triggers it, and what you observed. A proof-of-concept repo is ideal for registry issues.
+triggers it, and what you observed. For gate issues, the most useful report is a small repo
+plus the tree built from it, so the bad verdict can be reproduced exactly.
 
 You can expect an acknowledgement within 3 business days and an assessment within 10. If a
 fix ships, you will be credited in the changelog unless you ask otherwise.
