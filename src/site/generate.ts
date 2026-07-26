@@ -3,48 +3,20 @@ import type { SiteData } from './data.js';
 const esc = (s: string): string =>
   s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;').replace(/"/gu, '&quot;');
 
-export interface AskPanelOptions {
-  /** Repo clone URL for the run-locally instructions. */
-  cloneUrl: string;
-  repoLabel: string;
-}
 
-export interface ShareMetaOptions {
-  /** Absolute canonical URL of this page (og:url). */
-  url: string;
-  /** e.g. "94% of 2,477 statements verified against the code right now". */
-  status: string;
-}
-
-/** Render the self-contained explorer. One HTML file, zero external scripts; data embedded
- * as JSON; fonts degrade gracefully offline (air-gapped is a product promise).
- * `ask` (registry pages only) adds the Ask panel: run-locally instructions plus browser-side
- * BYO-key ask — the visitor's key calls Anthropic directly from their browser; the server
- * never sees keys, questions, or answers. */
-export const generateSiteHtml = (data: SiteData, opts: { ask?: AskPanelOptions; share?: ShareMetaOptions } = {}): string => {
+/** Render the self-contained explorer: one HTML file that makes zero network requests of any
+ * kind — no scripts, no stylesheets, no webfonts. Data is embedded as JSON and typography
+ * falls back to locally installed faces. A shared explorer must not tell anyone that it was
+ * opened, which rules out remote fonts as much as it rules out telemetry. */
+export const generateSiteHtml = (data: SiteData): string => {
   const json = JSON.stringify(data).replace(/</gu, '\\u003c');
-  const askJson = JSON.stringify(opts.ask ?? null).replace(/</gu, '\\u003c');
-  const shareMeta = opts.share
-    ? `
-<meta property="og:title" content="${esc(data.name)} — a verified map of this codebase">
-<meta property="og:description" content="${esc(opts.share.status)} Every statement links to the exact lines that prove it — checked mechanically, not just displayed.">
-<meta property="og:url" content="${esc(opts.share.url)}">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="OVERSTORY">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="${esc(data.name)} — verified codebase map">
-<meta name="twitter:description" content="${esc(opts.share.status)}">`
-    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(data.name)} — OVERSTORY</title>
-<meta name="description" content="Knowledge tree for ${esc(data.name)}: every claim carries a verifiable receipt.">${shareMeta}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<meta name="description" content="Knowledge tree for ${esc(data.name)}: every claim carries a verifiable receipt.">
 <style>
 :root {
   --bg0:#FAF9F5; --bg1:#FFFFFF; --bg2:#F1EFE9; --bg3:#E9E6DD; --line:#E4E1D8;
@@ -193,44 +165,10 @@ body[data-fixes] .fix-btn { display:inline-flex; }
 .fix-card .fc-copy { flex:none; padding:6px 12px; border:1px solid var(--line); border-radius:6px; font-size:12px; color:var(--accent); white-space:nowrap; }
 .fix-card .fc-copy:hover { border-color:var(--accent); }
 
-/* ---- Ask panel (registry pages only) ---- */
-.ask-open-btn { display:none; align-items:center; gap:7px; height:32px; padding:0 14px; border-radius:6px; background:var(--accent); color:#fff; font:500 12.5px var(--sans); }
-.ask-open-btn:hover { filter:brightness(1.08); }
-body[data-ask] .ask-open-btn { display:inline-flex; }
-.ask-panel { position:fixed; top:0; right:0; bottom:0; width:min(440px, 92vw); z-index:120; background:var(--bg1); border-left:1px solid var(--line); box-shadow:-8px 0 32px rgba(0,0,0,.12); transform:translateX(100%); transition:transform 220ms var(--ease); display:flex; flex-direction:column; }
-.ask-panel.open { transform:none; }
-.ap-head { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); }
-.ap-head .t { font:500 15px var(--serif); }
-.ap-close { margin-left:auto; color:var(--text3); font-size:16px; padding:2px 8px; }
-.ap-tabs { display:flex; gap:4px; padding:10px 14px 0; }
-.ap-tab { flex:1; padding:8px 10px; border-radius:7px 7px 0 0; font-size:12.5px; color:var(--text2); border:1px solid transparent; }
-.ap-tab.on { background:var(--bg0); border-color:var(--line); border-bottom-color:var(--bg0); color:var(--text); font-weight:500; }
-.ap-body { flex:1; overflow-y:auto; background:var(--bg0); border-top:1px solid var(--line); margin-top:-1px; padding:16px; font-size:13px; }
-.ap-body h4 { font:500 13.5px var(--sans); margin:0 0 6px; }
-.ap-body p { color:var(--text2); margin:0 0 10px; line-height:1.55; }
-.ap-cmds { background:var(--bg1); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font:400 11.5px/1.9 var(--mono); overflow-x:auto; white-space:pre; }
-.ap-copy { margin-top:8px; padding:6px 12px; border:1px solid var(--line); border-radius:6px; font-size:12px; color:var(--text2); }
-.ap-copy:hover { border-color:var(--accent); color:var(--accent); }
-.ap-field { width:100%; box-sizing:border-box; background:var(--bg1); border:1px solid var(--line); border-radius:7px; color:var(--text); font:400 12.5px var(--sans); padding:9px 11px; margin-bottom:8px; }
-.ap-field:focus { outline:none; border-color:var(--accent); }
-.ap-row { display:flex; gap:8px; align-items:center; margin-bottom:10px; color:var(--text3); font-size:11.5px; }
-.ap-go { width:100%; padding:9px; border-radius:7px; background:var(--accent); color:#fff; font:500 13px var(--sans); }
-.ap-go:disabled { opacity:.4; }
-.ap-status { color:var(--text2); font-size:12px; padding:10px 2px; }
-.ap-answer { margin-top:10px; font-size:13px; line-height:1.65; }
-.ap-chip { display:inline-flex; align-items:center; gap:3px; vertical-align:1px; margin:0 2px; padding:0 6px; border-radius:999px; font:500 10px var(--mono); border:1px solid var(--line); color:var(--accent); background:var(--bg1); }
-.ap-chip .d { width:5px; height:5px; border-radius:50%; }
-.ap-withheld { margin-top:10px; border-left:2px solid var(--stale); padding:4px 0 4px 10px; color:var(--text2); font-size:12px; }
-.ap-receipt { margin:8px 0; border:1px solid var(--line); border-radius:7px; background:var(--bg1); overflow:hidden; }
-.ap-receipt .rt { padding:6px 10px; border-bottom:1px dashed var(--line); font:400 10.5px var(--mono); color:var(--accent); }
-.ap-receipt pre { margin:0; padding:8px 0; overflow-x:auto; font:400 11px/1.5 var(--mono); }
-.ap-note { margin-top:12px; padding-top:10px; border-top:1px solid var(--line); color:var(--text3); font-size:11px; line-height:1.5; }
-.ap-err { color:var(--missing); font-size:12px; padding:8px 2px; }
 </style>
 </head>
 <body>
 <script id="overstory-data" type="application/json">${json}</script>
-<script id="overstory-ask-config" type="application/json">${askJson}</script>
 <div class="app">
   <header class="hdr">
     <button class="rail-toggle" id="railToggle" aria-label="Toggle tree">tree</button>
@@ -254,17 +192,7 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
       <kbd>/</kbd>
     </div>
     <button class="fix-btn" id="fixesBtn"></button>
-    <button class="ask-open-btn" id="askOpen">Ask this codebase</button>
   </header>
-  <aside class="ask-panel" id="askPanel" aria-label="Ask this codebase" hidden>
-    <div class="ap-head"><span class="t">Ask this codebase</span><button class="ap-close" id="askClose" aria-label="Close">&#10005;</button></div>
-    <div class="ap-tabs">
-      <button class="ap-tab on" id="tabLocal">Run locally (private)</button>
-      <button class="ap-tab" id="tabByok">Ask here (your key)</button>
-    </div>
-    <div class="ap-body" id="apLocal"></div>
-    <div class="ap-body" id="apByok" hidden></div>
-  </aside>
   <div class="frame">
     <nav class="rail" id="rail" aria-label="Knowledge tree">
       <div class="rail-hint" title="A green dot means everything inside checks out against the code; amber or red means something in that folder needs attention.">TRUST MAP — every dot is checked against the code</div>
@@ -404,8 +332,7 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
   function renderMain() {
     var main = document.getElementById('main');
     main.textContent = '';
-    var hosted = document.body.hasAttribute('data-ask');
-    if (hosted && !state.welcomed && !state.fixes && !state.query) main.appendChild(welcomeCard());
+    if (!state.welcomed && !state.fixes && !state.query) main.appendChild(welcomeCard());
     if (state.fixes) { renderFixes(main); return; }
     if (state.query) { renderSearch(main); return; }
     var node = DATA.nodes[state.current];
@@ -639,186 +566,6 @@ body[data-ask] .ask-open-btn { display:inline-flex; }
     }
   });
 
-  /* ---- Ask panel (present only when the page was rendered by the registry) ---- */
-  (function () {
-    var cfgEl = document.getElementById('overstory-ask-config');
-    var ASK = null;
-    try { ASK = JSON.parse(cfgEl.textContent); } catch (e) { ASK = null; }
-    if (!ASK) return;
-    document.body.setAttribute('data-ask', '1');
-    var panel = document.getElementById('askPanel');
-    panel.hidden = false;
-    var localBody = document.getElementById('apLocal');
-    var byokBody = document.getElementById('apByok');
-
-    function openPanel() { panel.classList.add('open'); }
-    function closePanel() { panel.classList.remove('open'); }
-    document.getElementById('askOpen').addEventListener('click', openPanel);
-    document.getElementById('askClose').addEventListener('click', closePanel);
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePanel(); });
-    document.getElementById('tabLocal').addEventListener('click', function () { setTab(true); });
-    document.getElementById('tabByok').addEventListener('click', function () { setTab(false); });
-    function setTab(local) {
-      document.getElementById('tabLocal').classList.toggle('on', local);
-      document.getElementById('tabByok').classList.toggle('on', !local);
-      localBody.hidden = !local;
-      byokBody.hidden = local;
-    }
-
-    /* Tab 1: run locally */
-    var cmds = 'git clone ' + ASK.cloneUrl + '\\ncd ' + ASK.repoLabel + '\\nnpx @northtek/overstory build   # local model or your API key\\nnpx @northtek/overstory serve   # opens the ask app';
-    localBody.appendChild(el('h4', '', 'The full ask experience runs on your machine'));
-    localBody.appendChild(el('p', '', 'Clone the repo and serve it locally: a ChatGPT-style app over this codebase where every answer sentence carries a receipt. Your code, your model, your machine — nothing is uploaded anywhere.'));
-    var pre = el('div', 'ap-cmds', cmds);
-    localBody.appendChild(pre);
-    var copyBtn = el('button', 'ap-copy', 'Copy commands');
-    copyBtn.addEventListener('click', function () {
-      navigator.clipboard.writeText(cmds).then(function () { copyBtn.textContent = 'Copied'; setTimeout(function () { copyBtn.textContent = 'Copy commands'; }, 1500); });
-    });
-    localBody.appendChild(copyBtn);
-    localBody.appendChild(el('p', 'ap-note', 'Works fully offline with a local model via Ollama. Private repos never touch this site — that is the point.'));
-
-    /* Tab 2: browser-side ask with the visitor’s own key */
-    byokBody.appendChild(el('h4', '', 'Ask right here, with your own API key'));
-    byokBody.appendChild(el('p', '', 'Your key is kept in this browser only and calls Anthropic directly from this page — it never touches this site’s server. Neither does your question or the answer.'));
-    var keyInput = document.createElement('input');
-    keyInput.type = 'password'; keyInput.className = 'ap-field'; keyInput.placeholder = 'sk-ant-…  (Anthropic API key)';
-    keyInput.value = sessionStorage.getItem('overstory-key') || localStorage.getItem('overstory-key') || '';
-    byokBody.appendChild(keyInput);
-    var rememberRow = el('div', 'ap-row');
-    var remember = document.createElement('input'); remember.type = 'checkbox'; remember.id = 'apRemember';
-    remember.checked = !!localStorage.getItem('overstory-key');
-    var rlabel = document.createElement('label'); rlabel.htmlFor = 'apRemember'; rlabel.textContent = 'remember on this device (otherwise this tab only)';
-    rememberRow.appendChild(remember); rememberRow.appendChild(rlabel);
-    byokBody.appendChild(rememberRow);
-    var modelSel = document.createElement('select'); modelSel.className = 'ap-field';
-    [['claude-haiku-4-5-20251001', 'Claude Haiku — fast, ~a cent per question'], ['claude-sonnet-5', 'Claude Sonnet — stronger answers']].forEach(function (m) {
-      var o = document.createElement('option'); o.value = m[0]; o.textContent = m[1]; modelSel.appendChild(o);
-    });
-    byokBody.appendChild(modelSel);
-    var qInput = document.createElement('textarea');
-    qInput.className = 'ap-field'; qInput.rows = 2; qInput.placeholder = 'What does this codebase…';
-    byokBody.appendChild(qInput);
-    var goBtn = el('button', 'ap-go', 'Ask — answers carry receipts');
-    byokBody.appendChild(goBtn);
-    var statusEl = el('div', 'ap-status', '');
-    var answerHost = el('div', '');
-    byokBody.appendChild(statusEl); byokBody.appendChild(answerHost);
-    byokBody.appendChild(el('p', 'ap-note', 'Every answer sentence must cite claims from this page’s verified tree; sentences that cite nothing verifiable are withheld and listed, never blended in. Manage or revoke keys at console.anthropic.com.'));
-
-    function evidenceSearch(q) {
-      var terms = q.toLowerCase().split(/[^a-z0-9_]+/).filter(function (t) { return t.length >= 2; });
-      var scored = [];
-      Object.keys(DATA.nodes).forEach(function (nid) {
-        DATA.nodes[nid].claims.forEach(function (c) {
-          var hay = (c.text + ' ' + DATA.nodes[nid].path).toLowerCase();
-          var score = 0;
-          terms.forEach(function (t) { if (hay.indexOf(t) >= 0) score += 1; });
-          if (c.verdict === 'VERIFIED') score += 0.5;
-          if (score > 0.5) scored.push({ claim: c, nid: nid, score: score });
-        });
-      });
-      scored.sort(function (a, b) { return b.score - a.score; });
-      return scored.slice(0, 8);
-    }
-
-    function renderAskAnswer(parsed, evidence) {
-      answerHost.textContent = '';
-      var box = el('div', 'ap-answer');
-      var withheld = [];
-      var used = {};
-      (parsed.answer || []).forEach(function (s) {
-        var refs = [];
-        (s.refs || []).forEach(function (r) {
-          var n = typeof r === 'number' ? r : parseInt(String(r).replace(/[^0-9]/g, ''), 10);
-          if (n >= 1 && n <= evidence.length) refs.push(n);
-        });
-        if (!refs.length) { withheld.push(s.text); return; }
-        box.appendChild(document.createTextNode(s.text + ' '));
-        refs.forEach(function (n) {
-          used[n] = true;
-          var ev = evidence[n - 1];
-          var chip = el('button', 'ap-chip');
-          chip.appendChild(document.createTextNode(String(n)));
-          var d = el('span', 'd');
-          d.style.background = ev.claim.verdict === 'VERIFIED' ? 'var(--verified)' : ev.claim.verdict === 'STALE' ? 'var(--stale)' : 'var(--missing)';
-          chip.appendChild(d);
-          chip.title = ev.claim.text;
-          chip.addEventListener('click', function () { toggleApReceipt(box, n, ev); });
-          box.appendChild(chip);
-        });
-      });
-      answerHost.appendChild(box);
-      if (withheld.length) {
-        var w = el('div', 'ap-withheld');
-        w.appendChild(el('div', '', withheld.length + ' statement' + (withheld.length === 1 ? '' : 's') + ' withheld (no verifiable citation):'));
-        withheld.forEach(function (t) { w.appendChild(el('div', '', '• ' + t)); });
-        answerHost.appendChild(w);
-      }
-      var total = (parsed.answer || []).length;
-      statusEl.textContent = total ? 'Grounded ' + Math.round(((total - withheld.length) / total) * 100) + '% · chips open receipts · computed in your browser' : 'No answer.';
-    }
-
-    function toggleApReceipt(box, n, ev) {
-      var existing = box.querySelector('[data-ap-receipt="' + n + '"]');
-      if (existing) { existing.remove(); return; }
-      var r = el('div', 'ap-receipt');
-      r.setAttribute('data-ap-receipt', String(n));
-      (ev.claim.spans || []).forEach(function (span) {
-        r.appendChild(el('div', 'rt', span.file + ':' + span.startLine + '-' + span.endLine + ' · ' + (ev.claim.verdict || '').toLowerCase()));
-        var pre = el('pre', '');
-        String(span.text).split('\\n').slice(0, 14).forEach(function (line, i) {
-          var lr = el('div', 'srcline');
-          lr.appendChild(el('span', 'ln', String(span.startLine + i)));
-          lr.appendChild(el('span', 'code', line === '' ? ' ' : line));
-          pre.appendChild(lr);
-        });
-        r.appendChild(pre);
-      });
-      if (!(ev.claim.spans || []).length) r.appendChild(el('div', 'rt', 'grounded in tree claim — open its node in the explorer'));
-      box.appendChild(r);
-    }
-
-    goBtn.addEventListener('click', function () {
-      var key = keyInput.value.trim();
-      var q = qInput.value.trim();
-      answerHost.textContent = '';
-      if (!key || key.indexOf('sk-') !== 0) { statusEl.textContent = ''; answerHost.appendChild(el('div', 'ap-err', 'Enter your Anthropic API key (starts with sk-ant-).')); return; }
-      if (!q) { answerHost.appendChild(el('div', 'ap-err', 'Ask something about this codebase.')); return; }
-      if (remember.checked) { localStorage.setItem('overstory-key', key); sessionStorage.removeItem('overstory-key'); }
-      else { sessionStorage.setItem('overstory-key', key); localStorage.removeItem('overstory-key'); }
-      var evidence = evidenceSearch(q);
-      if (!evidence.length) { statusEl.textContent = ''; answerHost.appendChild(el('div', 'ap-err', 'The tree has no claims matching that — try other words, or browse the tree.')); return; }
-      statusEl.textContent = 'Searching ' + DATA.total + ' claims → asking ' + (modelSel.value.indexOf('haiku') >= 0 ? 'Haiku' : 'Sonnet') + ' from your browser…';
-      goBtn.disabled = true;
-      var block = evidence.map(function (ev, i) { return '[' + (i + 1) + '] (' + (DATA.nodes[ev.nid].path || 'root') + ') ' + ev.claim.text; }).join('\\n');
-      var prompt = 'Answer the question using ONLY this numbered evidence about the codebase "' + DATA.name + '". Every answer sentence cites the evidence numbers that support it.\\n\\nReturn ONLY JSON: {"answer":[{"text":"one sentence","refs":[1,2]}]}\\n\\nEVIDENCE:\\n' + block + '\\n\\nQUESTION: ' + q;
-      fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({ model: modelSel.value, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
-      }).then(function (res) {
-        if (res.status === 401) throw new Error('Anthropic rejected the key (401). Check it at console.anthropic.com.');
-        if (res.status === 429) throw new Error('Rate limited by Anthropic (429) — wait a moment.');
-        if (!res.ok) throw new Error('Anthropic returned HTTP ' + res.status + '.');
-        return res.json();
-      }).then(function (data) {
-        var text = ((data.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
-        var first = text.indexOf('{');
-        var last = text.lastIndexOf('}');
-        var parsed = JSON.parse(first >= 0 ? text.slice(first, last + 1) : text);
-        renderAskAnswer(parsed, evidence);
-      }).catch(function (err) {
-        statusEl.textContent = '';
-        answerHost.appendChild(el('div', 'ap-err', String(err && err.message ? err.message : err)));
-      }).finally(function () { goBtn.disabled = false; });
-    });
-  })();
 
   /* fixes toggle */
   (function () {

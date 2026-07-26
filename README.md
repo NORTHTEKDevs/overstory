@@ -3,12 +3,12 @@
 [![CI](https://github.com/NORTHTEKDevs/overstory/actions/workflows/ci.yml/badge.svg)](https://github.com/NORTHTEKDevs/overstory/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@northtek/overstory)](https://www.npmjs.com/package/@northtek/overstory)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-[![overstory](https://overstory-virid.vercel.app/badge/gh/NORTHTEKDevs/overstory.svg)](https://overstory-virid.vercel.app/gh/NORTHTEKDevs/overstory)
 
 **A knowledge tree of your codebase where every claim carries a receipt.**
 
-> The last badge is this repository's own claims, re-verified against this repository's
-> current code every time you load it. If it drops below 100%, the docs drifted.
+> There is no hosted service, no account, and nothing to sign up for. It runs on your machine
+> and it stays there. CI on this repository verifies its own claims against its own code on
+> every push — that gate is the only thing the badges above report.
 
 > **30 seconds, no jargon:** AI tools sound exactly as confident when they're wrong as when
 > they're right. OVERSTORY reads your codebase, writes it up as short statements, and then
@@ -82,13 +82,15 @@ build time and labeled. Every claim is one click from its evidence; judge it you
 Builds are incremental and resumable: every leaf checkpoints on completion, and unchanged
 files are never re-summarized.
 
-## Hosted registry (preview)
+## Sharing a tree
 
-There's an experimental zero-storage registry that can show verified trees of public GitHub
-repos and re-check published trees against the live code (the registry stores nothing —
-your repo is the database). It's in quiet preview and not the point of v1: the product is
-the local tool. `overstory publish` targets it if you want to try it; details in
-[docs/registry-design.md](docs/registry-design.md).
+`overstory site` writes one HTML file with the whole explorer inside it — no scripts, no
+stylesheets, not even a webfont. Open it from disk, attach it to an email, commit it. It
+makes zero network requests, so sharing a tree tells nobody that it was opened.
+
+For a repository, committing `.overstory/tree.json` and adding `overstory verify` to CI is
+the durable version: reviewers see the claims in the diff, and the build fails when merged
+code stales them.
 
 ## MCP: notarize your agent's answers
 
@@ -116,7 +118,8 @@ what OVERSTORY ships), and RAIN's Reflexion loop discipline. BSHR
 ## Roadmap (deliberately not in v1)
 
 Embedding search, AST-precise chunking, watch mode, a CI bot that comments when merged code
-stales the docs, team/shared trees, `claude -p` as a provider. v1 is the trustworthy core.
+stales the docs, `claude -p` as a provider. The trustworthy local core is the whole of v1, and
+a hosted service is explicitly not on this list.
 
 ## License
 

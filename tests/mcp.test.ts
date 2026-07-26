@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -77,5 +77,16 @@ describe('MCP server round-trip', () => {
     await c2.connect(ct);
     const res: any = await c2.callTool({ name: 'overstory_map', arguments: {} });
     expect(JSON.parse(res.content[0].text).error).toContain('build');
+  });
+});
+
+describe('version reporting', () => {
+  it('the MCP handshake advertises the shipped package version, not a hardcoded one', async () => {
+    const { packageVersion } = await import('../src/core/version.js');
+    const pkg: { version: string } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    expect(packageVersion()).toBe(pkg.version);
+    // The server object must report the same value the CLI's --version prints.
+    const server = createOverstoryServer(process.cwd()) as unknown as { server: { _serverInfo: { version: string } } };
+    expect(server.server._serverInfo.version).toBe(pkg.version);
   });
 });

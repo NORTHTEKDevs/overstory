@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { buildTree, verifyExisting } from '../build/builder.js';
 import { loadCorpus } from '../core/corpus.js';
 import { loadTree, treePath } from '../core/store.js';
@@ -13,6 +12,7 @@ import { ask } from '../query/ask.js';
 import { buildSiteData } from '../site/data.js';
 import { generateSiteHtml } from '../site/generate.js';
 import { verifyTree } from '../core/gate.js';
+import { packageVersion } from '../core/version.js';
 
 const HELP = `overstory — a knowledge tree of your codebase where every claim carries a receipt.
 Local-first: nothing leaves this machine.
@@ -23,7 +23,6 @@ Usage:
   overstory verify [path]   Check every receipt against the current code (exit 1 if any fail)
   overstory ask "question" [path]   Answer from the tree with per-sentence receipts
   overstory fix    [path]   Paste-ready fix prompts for your agent, grounded in receipts
-  overstory publish [path]  Publish your tree to the registry (re-verified server-side)
   overstory site   [path]   Export the shareable single-file explorer
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
 
@@ -39,23 +38,6 @@ Options:
   --version, -v             Print the installed version
   --help, -h                Show this help
 `;
-
-/** Read the version from the shipped package.json. Resolved relative to this module so it
- * is correct whether running from dist/ or from source. */
-const packageVersion = (): string => {
-  for (const up of ['../../package.json', '../../../package.json']) {
-    try {
-      const path = fileURLToPath(new URL(up, import.meta.url));
-      const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
-      if (parsed !== null && typeof parsed === 'object' && 'version' in parsed) {
-        return String((parsed as { version: unknown }).version);
-      }
-    } catch {
-      // try the next candidate
-    }
-  }
-  return 'unknown';
-};
 
 interface Flags {
   provider: string;
@@ -268,51 +250,6 @@ const main = async (): Promise<number> => {
     if (findings.length > 10) log(`  … ${findings.length - 10} more`);
     log(`prompts: ${out}   (also in the app: overstory serve → Fixes)`);
     return 0;
-  }
-
-  if (cmd === 'publish') {
-    const { DEFAULT_REGISTRY, checkPublished, detectGithubRepo } = await import('../registry/publishClient.js');
-    const tree = await loadTree(treePath(root));
-    if (!tree) {
-      log('No tree found. Run: overstory build   (then publish)');
-      return 2;
-    }
-    // Local preflight: the registry will verify against GitHub; verify here first so the
-    // instructions we print are ones that will actually succeed.
-    const local = await verifyExisting(root);
-    if (local && local.verification.freshness < 1) {
-      log(`your tree is ${Math.round(local.verification.freshness * 100)}% verified locally — run overstory build first (stale: ${local.staleFiles.join(', ')})`);
-      return 1;
-    }
-    const repoFlagIdx = process.argv.indexOf('--repo');
-    const repoFlag = repoFlagIdx >= 0 ? process.argv[repoFlagIdx + 1] : undefined;
-    const parsed = repoFlag?.includes('/')
-      ? { owner: repoFlag.split('/')[0], repo: repoFlag.split('/')[1] }
-      : await detectGithubRepo(root);
-    if (!parsed) {
-      log('Could not detect a GitHub remote. Pass --repo owner/name.');
-      return 2;
-    }
-    const registry = process.env.OVERSTORY_REGISTRY ?? DEFAULT_REGISTRY;
-    log('publishing is a git push: your repo is the database, the registry stores nothing.');
-    const result = await checkPublished(registry, parsed.owner, parsed.repo);
-    if (flags.json) {
-      process.stdout.write(JSON.stringify(result) + '\n');
-      return result.published && result.freshness === 1 ? 0 : 1;
-    }
-    if (!result.published) {
-      log('your tree is not in the repo yet. Commit and push it:');
-      log('  git add -f .overstory/tree.json');
-      log('  git commit -m "docs: overstory tree" && git push');
-      log('then run overstory publish again to confirm the registry sees it.');
-      return 1;
-    }
-    const pct = Math.round((result.freshness ?? 0) * 100);
-    log(`published (${result.source}) — ${pct}% verified against GitHub @ ${result.sha?.slice(0, 7)}`);
-    if (pct < 100) log('note: your pushed code is ahead of your pushed tree — rebuild, recommit tree.json, push.');
-    if (result.url) log(`hosted: ${result.url}`);
-    if (result.badge) log(`badge:  ${result.badge}`);
-    return pct === 100 ? 0 : 1;
   }
 
   if (cmd === 'serve') {

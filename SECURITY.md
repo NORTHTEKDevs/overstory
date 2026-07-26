@@ -18,8 +18,8 @@ fix ships, you will be credited in the changelog unless you ask otherwise.
 - The `@northtek/overstory` CLI, MCP server, and local `serve` app.
 - The gate itself — in particular, any input that causes a claim to be reported `VERIFIED`
   when its cited text does not match the corpus. That is the core security property.
-- The hosted registry (currently at `overstory-virid.vercel.app`): resource exhaustion,
-  server-side request forgery, or any path that gets an unverified tree accepted as verified.
+- The exported explorer (`overstory site`). It is meant to be inert: if you find any way it
+  issues a network request, that is a bug worth reporting.
 
 **Out of scope**
 
@@ -38,11 +38,12 @@ such. Treat a `VERIFIED` verdict as "this citation is real and current," not "th
 is correct."
 
 The `serve` app binds to `127.0.0.1` and is intended for local use. It has no authentication;
-do not expose it to a network you do not control.
+do not expose it to a network you do not control. It loads webfonts from Google, being a local
+app you chose to run; the shareable `site` export deliberately does not.
 
-The hosted registry stores nothing. It fetches public repositories and published trees on
-demand, verifies them, and caches the rendered result. It never accepts source code uploads,
-and it cannot be used to publish claims that do not verify against the live repository.
+There is no hosted service. Nothing in this project uploads your code, and the only outbound
+request it can make is to an LLM provider you configured yourself — Ollama on your own machine
+by default, or the Anthropic API if you explicitly opt in.
 
 ## Known accepted risks
 

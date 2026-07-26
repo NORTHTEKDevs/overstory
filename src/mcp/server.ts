@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { loadCorpus } from '../core/corpus.js';
 import { verifyTree } from '../core/gate.js';
 import { loadTree, treePath } from '../core/store.js';
+import { packageVersion } from '../core/version.js';
 import { buildClaimIndex } from '../query/ask.js';
 import { notarizeClaims } from '../query/notarize.js';
 import type { CorpusSnapshot, Tree } from '../core/types.js';
@@ -17,7 +18,7 @@ const NEEDS_BUILD = 'No knowledge tree found. Run `npx @northtek/overstory build
  * own citations. Verification here is provenance + freshness — deliberately never a
  * claim of semantic truth. */
 export const createOverstoryServer = (root: string): McpServer => {
-  const server = new McpServer({ name: 'overstory', version: '0.1.0' });
+  const server = new McpServer({ name: 'overstory', version: packageVersion() });
 
   const load = async (): Promise<{ tree: Tree; corpus: CorpusSnapshot } | null> => {
     const tree = await loadTree(treePath(root));

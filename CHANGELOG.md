@@ -6,6 +6,30 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-26
+
+Scope decision: OVERSTORY is a local tool and an MCP server. There is no hosted service, and
+there will not be one.
+
+### Removed
+
+- **`overstory publish` and the hosted registry.** The Next.js registry app, the GitHub
+  tarball fetcher, the publish client, the freshness badge endpoint, and the registry design
+  doc are all gone. Publishing a tree is now what it always should have been: commit
+  `.overstory/tree.json`, or send someone the `overstory site` export.
+- **The browser "Ask this codebase" panel** from the exported explorer. It only ever rendered
+  on hosted pages, was never exercised against a live API, and shipped a browser-to-Anthropic
+  code path into an artifact that is supposed to be inert.
+- **Open Graph / Twitter share metadata** from the export, which existed only for hosted pages.
+
+### Fixed
+
+- **The exported explorer no longer loads webfonts from Google.** It was described as
+  self-contained and offline while fetching three resources from `fonts.googleapis.com`, so
+  opening a shared explorer disclosed to a third party that it had been opened. The export now
+  issues no network requests of any kind, enforced by a test that asserts their absence.
+  Typography falls back to locally installed faces. The local `serve` app still uses webfonts.
+
 ## [0.1.1] - 2026-07-25
 
 ### Added
@@ -50,6 +74,7 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/NORTHTEKDevs/overstory/releases/tag/v0.1.0

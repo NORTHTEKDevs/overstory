@@ -70,31 +70,26 @@ describe('generateSiteHtml', () => {
     for (const src of scripts) expect(() => new Function(src)).not.toThrow();
   });
 
-  it('share meta renders og/twitter tags only when share options are given', () => {
-    expect(html).not.toContain('og:title');
-    const withShare = generateSiteHtml(data, {
-      ask: { cloneUrl: 'https://github.com/o/r.git', repoLabel: 'r' },
-      share: { url: 'https://overstory.northtek.io/gh/o/r', status: '100% of 10 statements verified against the code right now.' },
-    });
-    expect(withShare).toContain('og:title');
-    expect(withShare).toContain('verified against the code right now');
-    expect(withShare).toContain('https://overstory.northtek.io/gh/o/r');
-    expect(withShare).toContain('welcome'); // first-visit explainer ships with hosted pages
-    expect(withShare).toContain('TRUST MAP');
-    for (const m of [...withShare.matchAll(/<script>([\s\S]*?)<\/script>/gu)]) {
-      expect(() => new Function(m[1])).not.toThrow();
-    }
+  it('ships the first-visit explainer and the trust-map rail', () => {
+    expect(html).toContain('welcome');
+    expect(html).toContain('TRUST MAP');
   });
 
-  it('ask panel is absent by default (offline export) and present with registry options', () => {
-    expect(html).toContain('"overstory-ask-config" type="application/json">null<');
-    const withAsk = generateSiteHtml(data, { ask: { cloneUrl: 'https://github.com/o/r.git', repoLabel: 'r' } });
-    expect(withAsk).toContain('Ask this codebase');
-    expect(withAsk).toContain('anthropic-dangerous-direct-browser-access');
-    expect(withAsk).toContain('sessionStorage');
-    expect(withAsk).toContain('https://github.com/o/r.git');
-    for (const m of [...withAsk.matchAll(/<script>([\s\S]*?)<\/script>/gu)]) {
-      expect(() => new Function(m[1])).not.toThrow();
+  it('the export is inert: no network egress of any kind', () => {
+    // The shared explorer is an offline artifact. Anything that could phone home — an API
+    // call, a remote script, a form post — breaks the promise the product is sold on, so
+    // this asserts absence rather than trusting that nobody added one.
+    for (const forbidden of [
+      'fetch(', 'XMLHttpRequest', 'anthropic', '<form', 'navigator.sendBeacon', 'import(',
+      'googleapis', 'gstatic', 'http://', 'https://',
+    ]) {
+      expect(html.toLowerCase()).not.toContain(forbidden.toLowerCase());
     }
+    expect(html).not.toMatch(/<script[^>]+src=/u);
+    expect(html).not.toMatch(/<link[^>]+href=/u);
+    // Every inline script must still be syntactically valid after the removal.
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/gu)];
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const m of scripts) expect(() => new Function(m[1])).not.toThrow();
   });
 });

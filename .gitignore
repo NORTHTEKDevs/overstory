@@ -11,10 +11,6 @@ final-build.log
 fresh-build.json
 fresh-build.log
 serve.log
-web/node_modules/
-web/.next/
-web/start.log
-web/next-env.d.ts
 
 .vercel
 *.tgz
