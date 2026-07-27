@@ -6,6 +6,43 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-27
+
+The no-LLM path is now the good path. Previously a build without a model produced claims like
+``Declares `const K1` `` — technically true, useless to read, and the default experience for
+anyone who ran `npx @northtek/overstory build` without Ollama installed.
+
+### Added
+
+- **Doc comments become verified claims.** A declaration carrying a doc comment now produces
+  a claim from the author's own description, citing the comment *and* the declaration as one
+  span. `` `saveTree(path, tree)`: Atomic save: write temp then rename, so a killed build
+  never corrupts the tree. `` Because both are in the receipt, editing the code without
+  updating the comment flips the claim to `STALE` — deterministic comment-rot detection with
+  no model involved. Supports JSDoc/block comments, `//`, `///`, `#`, and `--` runs, and steps
+  over decorators and attributes.
+- **Signatures instead of raw source lines.** `Exports \`read(path, opts)\`` rather than
+  ``Declares `export function read`.``, with types dropped for readability (the receipt still
+  carries the exact source).
+- **Claim ranking.** Documented and exported symbols outrank private declarations when a
+  chunk has more candidates than slots, so a documented function is no longer buried under
+  the private constants that happen to precede it.
+- **Build ETA and an escape hatch.** An LLM build announces how many files it will summarize
+  and shows a running estimate, because a 30-minute local-model build with no feedback is
+  indistinguishable from a hang.
+
+### Fixed
+
+- **Source directories named `build`, `dist`, `out`, `target`, or `vendor` were silently
+  dropped.** These names were excluded at any depth, so `src/build/` — this project's own
+  builder, seven files — never entered its own knowledge tree, and any Java, Rust, or Go
+  project with a source path containing them lost code with no warning. They are now excluded
+  only at the repository root; dependency and tool directories are still excluded everywhere.
+- **`100% verified` could print alongside `stale evidence in: ...`.** 416 of 417 claims is
+  99.76%, which rounded to "100%". Freshness now floors, and 100 is reserved for a tree with
+  nothing stale. Applied to the CLI, the local app, and the exported explorer.
+- Optional parameters kept their `?` in generated signatures (`read(path, opts?)`).
+
 ## [0.2.0] - 2026-07-26
 
 Scope decision: OVERSTORY is a local tool and an MCP server. There is no hosted service, and
@@ -74,7 +111,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/NORTHTEKDevs/overstory/releases/tag/v0.1.0

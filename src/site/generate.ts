@@ -205,6 +205,8 @@ body[data-fixes] .fix-btn { display:inline-flex; }
 (function () {
   'use strict';
   var DATA = JSON.parse(document.getElementById('overstory-data').textContent);
+  // Never round a partly-stale tree up to 100: mirrors freshnessPct() in src/core/gate.ts.
+  function freshPct(f) { return f >= 1 ? 100 : Math.min(99, Math.floor(f * 100)); }
   var state = { current: DATA.root, open: {}, query: '' };
   state.open[DATA.root] = true;
 
@@ -228,7 +230,7 @@ body[data-fixes] .fix-btn { display:inline-flex; }
   document.getElementById('treeName').textContent = DATA.name;
   document.title = DATA.name + ' — OVERSTORY';
   function renderFresh() {
-    var pct = Math.round(DATA.freshness * 100);
+    var pct = freshPct(DATA.freshness);
     var numEl = document.getElementById('freshNum');
     var label = document.getElementById('freshLabel');
     if (pct < 100) numEl.classList.add('warn');
@@ -309,7 +311,7 @@ body[data-fixes] .fix-btn { display:inline-flex; }
   }
 
   function welcomeCard() {
-    var pct = Math.round(DATA.freshness * 100);
+    var pct = freshPct(DATA.freshness);
     var card = el('div', 'welcome');
     card.appendChild(el('div', 'w-title', 'You\\u2019re looking at a verified map of ' + DATA.name));
     var body = el('div', 'w-body');

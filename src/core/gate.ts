@@ -149,6 +149,15 @@ export const verifyTree = (tree: Tree, corpus: CorpusSnapshot): TreeVerification
 
 /** Write verdicts + healed span positions back into a (copied) tree. Healing updates only
  * line numbers — text and hash are untouched, so the receipt itself never changes. */
+/** Freshness as a whole-number percentage that never overstates.
+ *
+ * Plain rounding reports 99.7% as "100%", so a tree with a stale claim announces itself as
+ * fully verified and then lists the stale file underneath — the one kind of dishonesty this
+ * project cannot afford in its own output. Anything short of perfect is floored, and only a
+ * genuinely complete tree is allowed to print 100. */
+export const freshnessPct = (freshness: number): number =>
+  freshness >= 1 ? 100 : Math.min(99, Math.floor(freshness * 100));
+
 export const applyVerification = (tree: Tree, verification: TreeVerification): Tree => {
   const nodes: Tree['nodes'] = {};
   for (const [id, node] of Object.entries(tree.nodes)) {

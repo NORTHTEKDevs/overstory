@@ -10,26 +10,42 @@
 > and it stays there. CI on this repository verifies its own claims against its own code on
 > every push — that gate is the only thing the badges above report.
 
-> **30 seconds, no jargon:** AI tools sound exactly as confident when they're wrong as when
-> they're right. OVERSTORY reads your codebase, writes it up as short statements, and then
-> **checks every statement against the actual code** — click any one to see the exact lines
-> it came from. When the code changes, the affected statements flip to "stale" instead of
-> quietly becoming lies. Ask questions and get answers where every sentence carries a
-> checkable receipt; statements that can't be verified are withheld and say so. All of it
-> runs on your machine — your code never leaves.
->
-> Try it: `npx @northtek/overstory build && npx @northtek/overstory serve`
+Every doc comment is a claim about the code beneath it. Nobody checks those claims, so they
+rot quietly — the signature changes, the comment doesn't, and the lie ships. OVERSTORY reads
+your repo into a tree of atomic claims, each citing the exact lines that support it, and
+verifies every one against the live code. When the evidence changes, the claim goes stale
+instead of staying confidently wrong.
 
-OVERSTORY turns any repo or docs folder into an explorable, hierarchical map — file to module
-to system — in which every statement is an atomic claim citing the exact source lines that
-support it. Citations are verified mechanically, not displayed decoratively: a claim whose
-evidence changed is marked stale, a claim whose evidence vanished is marked missing, and a
-claim with no evidence is never presented as verified.
+```console
+$ npx @northtek/overstory build
+provider: extractive (no LLM)
+done in 0.2s — 88 nodes, 381 claims, 100% verified
 
-Local-first by default. With the local Ollama engine or the deterministic extractive engine
-(no LLM at all), your code never leaves your machine — air-gapped works. The Anthropic API is
-an explicit opt-in, and only then does source text leave the machine (to Anthropic, for
-summarization). The gate itself is always local.
+$ # someone renames a parameter and leaves the comment above it alone
+
+$ npx @northtek/overstory verify
+99% of claims verified against the current code
+stale evidence in: src/core/corpus.ts
+run: overstory build   (rebuilds only what changed)
+
+$ echo $?
+1
+```
+
+**No API key, no model, no network.** The default build derives claims from your code's own
+structure and doc comments, so a documented function becomes a claim you can check:
+
+> **`saveTree(path, tree)`**: Atomic save: write temp then rename, so a killed build never
+> corrupts the tree. &nbsp;`VERIFIED`
+
+The receipt cites the comment *and* the signature as one span. Change either without the
+other and the gate catches it. That much works with zero AI involved. Point it at a local
+Ollama model or the Anthropic API and the same tree gets prose summaries instead — same gate,
+same receipts, your choice of how much machine you want in the loop.
+
+Local-first by default: with Ollama or the deterministic engine, your code never leaves your
+machine — air-gapped works. The Anthropic API is an explicit opt-in, and only then does source
+text leave the machine. The gate itself is always local.
 
 ```
 npx @northtek/overstory build     # build the tree (resumable; reuses unchanged files)

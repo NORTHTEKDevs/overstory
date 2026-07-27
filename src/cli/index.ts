@@ -11,7 +11,7 @@ import { serve } from '../serve/server.js';
 import { ask } from '../query/ask.js';
 import { buildSiteData } from '../site/data.js';
 import { generateSiteHtml } from '../site/generate.js';
-import { verifyTree } from '../core/gate.js';
+import { freshnessPct, verifyTree } from '../core/gate.js';
 import { packageVersion } from '../core/version.js';
 
 const HELP = `overstory — a knowledge tree of your codebase where every claim carries a receipt.
@@ -117,6 +117,12 @@ const main = async (): Promise<number> => {
     log(provider ? `provider: ${provider.name} (reflexion rounds: ${flags.rounds})` : 'provider: extractive (no LLM)');
     const started = Date.now();
     let lastLine = '';
+    // A local-model build of a real repo runs for tens of minutes. Without a size estimate
+    // and a running ETA it is indistinguishable from a hang, and the honest escape hatch is
+    // one flag away — so say so before the first long wait, not after it.
+    let announced = false;
+    let summarized = 0;
+    let summarizeStart = 0;
     const result = await buildTree(root, {
       provider,
       critic,
@@ -125,7 +131,23 @@ const main = async (): Promise<number> => {
       maxFiles: flags.maxFiles,
       onProgress: (e) => {
         if (e.phase === 'leaves' && e.total) {
-          lastLine = `  leaves ${e.done}/${e.total} ${e.reused ? '(reused) ' : ''}${e.file ?? ''}`;
+          if (!announced) {
+            announced = true;
+            summarizeStart = Date.now();
+            if (provider) {
+              log(`  ${e.total} files to summarize. Local models typically take 20-60s each, so this can run long.`);
+              log('  Ctrl-C and re-run with --provider none for an instant deterministic build.');
+            }
+          }
+          if (!e.reused) summarized++;
+          let eta = '';
+          const done = e.done ?? 0;
+          if (provider && summarized >= 2 && e.total > done) {
+            const perFile = (Date.now() - summarizeStart) / summarized;
+            const minutes = Math.round(((e.total - done) * perFile) / 60000);
+            eta = minutes >= 1 ? `  ~${minutes}m left` : '  <1m left';
+          }
+          lastLine = `  leaves ${e.done}/${e.total} ${e.reused ? '(reused) ' : ''}${e.file ?? ''}${eta}`;
           log(lastLine);
         } else if (e.phase === 'aggregate' && e.done === 1) log('  rolling up directories…');
         else if (e.phase === 'verify') log('  gate sweep: verifying every receipt…');
@@ -133,7 +155,7 @@ const main = async (): Promise<number> => {
       },
     });
     const secs = ((Date.now() - started) / 1000).toFixed(1);
-    const pct = Math.round(result.verification.freshness * 100);
+    const pct = freshnessPct(result.verification.freshness);
     if (flags.json) {
       process.stdout.write(JSON.stringify({
         nodes: Object.keys(result.tree.nodes).length,
@@ -158,7 +180,7 @@ const main = async (): Promise<number> => {
       log('No tree found (or the tree file is invalid). Run: overstory build');
       return 2;
     }
-    const pct = Math.round(result.verification.freshness * 100);
+    const pct = freshnessPct(result.verification.freshness);
     if (flags.json) {
       process.stdout.write(JSON.stringify({ freshness: result.verification.freshness, staleFiles: result.staleFiles }) + '\n');
     } else {

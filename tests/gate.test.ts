@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeText, sha256, splitLines } from '../src/core/hash.js';
-import { makeSpan, verifyClaim, verifySpan, verifyTree } from '../src/core/gate.js';
+import { freshnessPct, makeSpan, verifyClaim, verifySpan, verifyTree } from '../src/core/gate.js';
 import type { Claim, CorpusSnapshot, Tree, TreeNode } from '../src/core/types.js';
 
 const corpusOf = (files: Record<string, string>): CorpusSnapshot => {
@@ -125,5 +125,22 @@ describe('verifyTree', () => {
     expect(result.verdicts.get('c2')).toBe('UNGROUNDED');
     expect(result.freshness).toBeCloseTo(0.5);
     expect(result.byNode.get('n1')).toEqual({ verified: 1, total: 2 });
+  });
+});
+
+describe('freshnessPct', () => {
+  it('never rounds a stale tree up to 100', () => {
+    // The bug this guards: 416/417 verified is 99.76%, which Math.round reports as "100%
+    // verified" on the same screen as "stale evidence in: ...".
+    expect(freshnessPct(416 / 417)).toBe(99);
+    expect(freshnessPct(0.999)).toBe(99);
+    expect(freshnessPct(0.995)).toBe(99);
+  });
+
+  it('reserves 100 for a genuinely complete tree, and floors everything else', () => {
+    expect(freshnessPct(1)).toBe(100);
+    expect(freshnessPct(0.9)).toBe(90);
+    expect(freshnessPct(0.947)).toBe(94);
+    expect(freshnessPct(0)).toBe(0);
   });
 });

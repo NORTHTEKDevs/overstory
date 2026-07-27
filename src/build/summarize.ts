@@ -3,6 +3,7 @@ import { chunkFile } from '../core/chunk.js';
 import { makeSpan } from '../core/gate.js';
 import type { Claim, CorpusSnapshot, SpanRef } from '../core/types.js';
 import type { ChatProvider } from '../llm/provider.js';
+import { firstSentence, isExported, precedingDoc, signatureOf } from './docblock.js';
 
 const DECL_RE =
   /^(export\s|function\s|class\s|def\s|async def\s|fn\s|pub\s|impl\s|interface\s|type\s|const\s|let\s|var\s|struct\s|enum\s|mod\s|module\s|public\s|private\s)/u;
@@ -52,12 +53,23 @@ export const parseClaimDrafts = (raw: string): ClaimDraft[] => {
   throw new Error('unparseable claims JSON');
 };
 
-/** Deterministic no-LLM claims: declarations, headings, or an honest content statement.
- * Supported-by-construction (text is derived mechanically from the cited lines). */
+/** Deterministic no-LLM claims: documented symbols, declarations, headings, or an honest
+ * content statement. Supported-by-construction — every claim's text is derived mechanically
+ * from the lines it cites, so it can never assert more than the evidence shows.
+ *
+ * Where a declaration carries a doc comment, the comment and the declaration are cited as a
+ * single span. That makes the author's own description the claim, and makes comment rot a
+ * first-class gate failure: change the code without updating the comment and the claim goes
+ * STALE at the next `overstory verify`. */
 export const extractiveClaims = (file: string, span: SpanRef, corpus: CorpusSnapshot): Omit<Claim, 'id'>[] => {
   const lines = span.text.split('\n');
-  const claims: Omit<Claim, 'id'>[] = [];
-  for (let i = 0; i < lines.length && claims.length < 6; i++) {
+  // Gather every candidate, then keep the most informative. Taking the first N in source
+  // order buries a documented function under a run of private constants that happen to be
+  // declared above it.
+  const candidates: { claim: Omit<Claim, 'id'>; rank: number; line: number }[] = [];
+  let consumedThrough = -1; // last index already covered by a documented-symbol claim
+  for (let i = 0; i < lines.length; i++) {
+    if (i <= consumedThrough) continue;
     const abs = span.startLine + i;
     const heading = HEADING_RE.exec(lines[i]);
     if (heading) {
@@ -65,21 +77,54 @@ export const extractiveClaims = (file: string, span: SpanRef, corpus: CorpusSnap
       // receipt shows the evidence, not just the headline.
       let end = i + 1;
       while (end < lines.length && !HEADING_RE.test(lines[end]) && end - i < 12) end++;
-      claims.push({
-        text: `Documents "${heading[2].trim()}".`,
-        citations: [{ kind: 'span', span: makeSpan(file, abs, span.startLine + end - 1, corpus) }],
-        faithfulness: 'supported',
+      candidates.push({
+        rank: 0,
+        line: abs,
+        claim: {
+          text: `Documents "${heading[2].trim()}".`,
+          citations: [{ kind: 'span', span: makeSpan(file, abs, span.startLine + end - 1, corpus) }],
+          faithfulness: 'supported',
+        },
       });
       continue;
     }
     if (DECL_RE.test(lines[i])) {
-      claims.push({
-        text: `Declares \`${lines[i].trim().replace(/\s*[{(=].*$/u, '').slice(0, 100)}\`.`,
-        citations: [{ kind: 'span', span: makeSpan(file, abs, abs, corpus) }],
-        faithfulness: 'supported',
+      const sig = signatureOf(lines[i]);
+      const doc = precedingDoc(lines, i);
+      const exported = isExported(lines[i]);
+      if (sig && doc) {
+        // One span covering comment through declaration: the pairing is the evidence.
+        candidates.push({
+          rank: exported ? 0 : 1,
+          line: abs,
+          claim: {
+            text: `\`${sig}\`: ${firstSentence(doc.text)}`,
+            citations: [{ kind: 'span', span: makeSpan(file, span.startLine + doc.startIndex, abs, corpus) }],
+            faithfulness: 'supported',
+          },
+        });
+        consumedThrough = i;
+        continue;
+      }
+      candidates.push({
+        rank: exported ? 2 : 3,
+        line: abs,
+        claim: {
+          text: sig
+            ? `${exported ? 'Exports' : 'Declares'} \`${sig}\`.`
+            : `Declares \`${lines[i].trim().replace(/\s*[{(=].*$/u, '').slice(0, 100)}\`.`,
+          citations: [{ kind: 'span', span: makeSpan(file, abs, abs, corpus) }],
+          faithfulness: 'supported',
+        },
       });
     }
   }
+  // Best first, then restore source order so the ledger still reads top-to-bottom.
+  const claims = candidates
+    .sort((a, b) => a.rank - b.rank || a.line - b.line)
+    .slice(0, 8)
+    .sort((a, b) => a.line - b.line)
+    .map((c) => c.claim);
   if (claims.length === 0) {
     const firstLine = lines.find((l) => l.trim().length > 0) ?? '';
     claims.push({

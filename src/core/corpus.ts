@@ -7,11 +7,30 @@ import type { CorpusSnapshot } from './types.js';
 
 const execFileP = promisify(execFile);
 
-const DEFAULT_EXCLUDED_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', 'out', 'target', 'vendor', 'coverage',
-  '.next', '.nuxt', '.overstory', '.cache', '__pycache__', '.venv', 'venv',
-  '.idea', '.vscode', '.turbo', '.pytest_cache',
+/** Never source, at any depth. Tool caches and dependency trees only. */
+const ALWAYS_EXCLUDED_DIRS = new Set([
+  'node_modules', '.git', '.overstory', '.next', '.nuxt', '.cache',
+  '__pycache__', '.venv', 'venv', '.idea', '.vscode', '.turbo', '.pytest_cache',
 ]);
+
+/** Conventional build-output directory names. These are excluded ONLY at the repository
+ * root, because the same words are ordinary source directories further down: `src/build/`
+ * holds this project's own builder, Java puts sources under paths containing `target`, and
+ * plenty of codebases have a `lib/vendor/`. Matching them at any depth silently deletes real
+ * code from the tree — and a knowledge tree that quietly omits a directory is worse than one
+ * that admits it does not know. Gitignored build output is already excluded by the git
+ * listing, so this set is only a fallback for non-repo roots. */
+const ROOT_ONLY_EXCLUDED_DIRS = new Set(['dist', 'build', 'out', 'target', 'vendor', 'coverage']);
+
+/** Is this path segment excluded, given how deep it sits? */
+const isExcludedDir = (name: string, depth: number): boolean =>
+  ALWAYS_EXCLUDED_DIRS.has(name) || (depth === 0 && ROOT_ONLY_EXCLUDED_DIRS.has(name));
+
+/** A path is excluded when any of its directory segments is. */
+const hasExcludedSegment = (relPath: string): boolean => {
+  const parts = relPath.split('/');
+  return parts.slice(0, -1).some((part, depth) => isExcludedDir(part, depth));
+};
 
 /** Machine-generated files that add noise, not knowledge. */
 const EXCLUDED_FILENAMES = new Set([
@@ -73,7 +92,7 @@ const walk = async (root: string, rel = ''): Promise<string[]> => {
     if (entry.isSymbolicLink()) continue;
     const childRel = rel === '' ? entry.name : `${rel}/${entry.name}`;
     if (entry.isDirectory()) {
-      if (DEFAULT_EXCLUDED_DIRS.has(entry.name)) continue;
+      if (isExcludedDir(entry.name, rel === '' ? 0 : rel.split('/').length)) continue;
       files.push(...(await walk(root, childRel)));
     } else if (entry.isFile()) {
       files.push(childRel);
@@ -101,7 +120,7 @@ export const loadCorpus = async (root: string, opts: LoadOptions = {}): Promise<
   if (!candidates) candidates = await walk(root);
   candidates = candidates
     .map((f) => f.replace(/\\/gu, '/'))
-    .filter((f) => !f.split('/').some((part) => DEFAULT_EXCLUDED_DIRS.has(part)))
+    .filter((f) => !hasExcludedSegment(f))
     .filter((f) => !EXCLUDED_FILENAMES.has(f.split('/').pop() ?? ''))
     .sort();
 

@@ -235,6 +235,8 @@ textarea { font:inherit; color:inherit; }
 (function () {
   'use strict';
   var state = { overview: null, threads: [], view: 'home', thread: null, streaming: false, treeData: null, libNode: null, libOpen: {} };
+  // Never round a partly-stale tree up to 100: mirrors freshnessPct() in src/core/gate.ts.
+  function freshPct(f) { return f >= 1 ? 100 : Math.min(99, Math.floor(f * 100)); }
   var SEAL_WORD = { VERIFIED: 'verified', STALE: 'stale', OUT_OF_CORPUS: 'missing', UNGROUNDED: 'ungrounded' };
   var SEAL_TITLE = {
     VERIFIED: 'Receipt checked: the cited lines exist and are unchanged.',
@@ -282,7 +284,7 @@ textarea { font:inherit; color:inherit; }
   function renderSidebarMeta() {
     var o = state.overview;
     if (!o || o.error) return;
-    var pct = Math.round(o.freshness * 100);
+    var pct = freshPct(o.freshness);
     var pill = document.getElementById('freshPill');
     pill.classList.toggle('ok', pct === 100);
     pill.classList.toggle('warn', pct < 100);
@@ -700,7 +702,7 @@ textarea { font:inherit; color:inherit; }
     rail.appendChild(treeNodeEl(d.root));
 
     var node = d.nodes[state.libNode] || d.nodes[d.root];
-    var pct = Math.round(d.freshness * 100);
+    var pct = freshPct(d.freshness);
     var banner = el('div', 'lib-banner');
     var bp = el('span', 'pct', pct + '%');
     bp.style.color = pct === 100 ? 'var(--verified)' : 'var(--stale)';

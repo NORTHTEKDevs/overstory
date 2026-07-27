@@ -61,3 +61,43 @@ describe('loadCorpus', () => {
     expect(files).toEqual(['src/a.ts', 'src/deep/b.ts']);
   });
 });
+
+describe('build-output exclusions are anchored to the root', () => {
+  let deep: string;
+
+  beforeAll(async () => {
+    deep = mkdtempSync(join(tmpdir(), 'overstory-dirs-'));
+    // Root-level build output: genuinely generated, must be skipped.
+    mkdirSync(join(deep, 'dist'), { recursive: true });
+    writeFileSync(join(deep, 'dist', 'bundle.js'), 'export const generated = 1;\n');
+    mkdirSync(join(deep, 'build'), { recursive: true });
+    writeFileSync(join(deep, 'build', 'out.js'), 'export const alsoGenerated = 1;\n');
+    // The same words nested under src/ are ordinary source directories. This project keeps
+    // its own builder in src/build/, and excluding by bare name at any depth silently
+    // deleted it from the tree.
+    mkdirSync(join(deep, 'src', 'build'), { recursive: true });
+    writeFileSync(join(deep, 'src', 'build', 'builder.ts'), 'export const realSource = 1;\n');
+    mkdirSync(join(deep, 'lib', 'vendor'), { recursive: true });
+    writeFileSync(join(deep, 'lib', 'vendor', 'shim.ts'), 'export const vendored = 1;\n');
+    // Dependency and VCS trees are never source, at any depth.
+    mkdirSync(join(deep, 'src', 'node_modules'), { recursive: true });
+    writeFileSync(join(deep, 'src', 'node_modules', 'dep.js'), 'module.exports = 1;\n');
+  });
+
+  afterAll(() => rmSync(deep, { recursive: true, force: true }));
+
+  it('keeps nested source directories that share a build-output name', async () => {
+    const { files } = await loadCorpus(deep, { useGit: false });
+    const paths = [...files.keys()];
+    expect(paths).toContain('src/build/builder.ts');
+    expect(paths).toContain('lib/vendor/shim.ts');
+  });
+
+  it('still skips root build output and dependency trees at any depth', async () => {
+    const { files } = await loadCorpus(deep, { useGit: false });
+    const paths = [...files.keys()];
+    expect(paths).not.toContain('dist/bundle.js');
+    expect(paths).not.toContain('build/out.js');
+    expect(paths).not.toContain('src/node_modules/dep.js');
+  });
+});

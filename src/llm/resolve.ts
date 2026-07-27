@@ -30,7 +30,11 @@ export const resolveProviders = async (opts: ResolveOptions = {}): Promise<Resol
       return { provider, critic: provider };
     }
     if (wanted === 'ollama') throw new Error('Ollama is not reachable at localhost:11434. Start it, or use --provider none.');
-    opts.onNotice?.('No LLM available (no ANTHROPIC_API_KEY, Ollama unreachable) — answers fall back to verified evidence claims.');
+    opts.onNotice?.(
+      'No LLM configured — building from your code\'s own structure and doc comments.\n' +
+        '  This mode is deterministic and offline: claims are your comments and signatures, cited to the line.\n' +
+        '  For prose summaries of what code does, start Ollama (ollama pull qwen2.5:14b) or set ANTHROPIC_API_KEY.',
+    );
   }
   return { provider: null, critic: null };
 };
