@@ -6,6 +6,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-27
+
+### Changed
+
+- The README now shows the product: the claim ledger with a receipt unfolded to its file,
+  line range, `sha256` and source line; the ask-first app; and the Models & keys panel. All
+  captured from the running app rather than mocked up, and referenced by absolute URL so they
+  render on the npm page as well as on GitHub. No code changes.
+
 ## [0.4.0] - 2026-07-27
 
 Bring your own key, without leaving the app.
@@ -151,7 +160,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.1...v0.2.0
