@@ -6,6 +6,7 @@ import type { Server } from 'node:http';
 import { buildTree } from '../src/build/builder.js';
 import { mockProvider } from '../src/llm/mock.js';
 import { createOverstoryHttpServer } from '../src/serve/server.js';
+import { appHtml } from '../src/serve/app.js';
 
 let root: string;
 let server: Server;
@@ -115,5 +116,24 @@ describe('overstory serve', () => {
     const res = await fetch(`${base}/api/ask`, { method: 'POST', body: '{"question":""}' });
     expect(res.status).toBe(400);
     expect((await fetch(`${base}/api/overview`)).status).toBe(200); // still alive
+  });
+});
+
+describe('the served app shell', () => {
+  it('emits inline JavaScript that actually parses', () => {
+    // This file is one big TypeScript template literal, so a stray backtick ends the
+    // template and a bare \n becomes a real newline inside a JS string. Both compile
+    // cleanly and both produce a blank app in the browser, which no other test notices.
+    const html = appHtml();
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/gu)];
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const m of scripts) expect(() => new Function(m[1])).not.toThrow();
+  });
+
+  it('ships the settings view and its wiring', () => {
+    const html = appHtml();
+    for (const needed of ['navSet', 'renderSettings', 'paintProviders', 'rebuildWith', '/api/providers']) {
+      expect(html).toContain(needed);
+    }
   });
 });

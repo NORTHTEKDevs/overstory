@@ -171,6 +171,54 @@ textarea { font:inherit; color:inherit; }
 .claim .fl.unsupported { color:var(--missing); border-color:var(--missing); }
 .claim .r-wrap { padding:0 12px 12px; }
 .empty { padding:60px 24px; text-align:center; color:var(--text2); font-size:14px; }
+/* models & keys */
+.setwrap { max-width:800px; margin:0 auto; padding:30px 32px 80px; }
+.set-h1 { font:450 26px/1.25 var(--serif); margin-bottom:8px; }
+.set-lede { font-size:13.5px; color:var(--text2); max-width:62ch; margin-bottom:18px; }
+.set-status { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; font-size:12.5px; color:var(--text2); }
+.set-active-label { color:var(--text3); }
+.set-active { font:500 12px var(--mono); background:var(--subtle); border:1px solid var(--line); border-radius:5px; padding:2px 8px; color:var(--accent); }
+.set-flash { font-size:12.5px; color:var(--verified); }
+.set-flash.err { color:var(--missing); }
+.set-loading, .set-err { font-size:13px; color:var(--text3); padding:12px 0; }
+.set-err { color:var(--missing); }
+.set-list { display:flex; flex-direction:column; gap:12px; }
+.set-foot { font-size:12px; color:var(--text3); margin-top:6px; line-height:1.7; }
+.set-foot code { font:400 11px var(--mono); background:var(--subtle); border-radius:4px; padding:1px 5px; overflow-wrap:anywhere; }
+.pcard { border:1px solid var(--line); border-radius:12px; background:var(--surface); padding:16px 18px; box-shadow:var(--shadow-sm); }
+.pcard.ready { border-color:color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.pcard-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+.pcard-name { font-weight:500; font-size:14.5px; }
+.pcard-priv { font:400 10.5px var(--mono); border-radius:999px; padding:2px 9px; border:1px solid; }
+.pcard-priv.on { color:var(--verified); border-color:color-mix(in srgb, var(--verified) 40%, transparent); background:color-mix(in srgb, var(--verified) 8%, transparent); }
+.pcard-priv.off { color:var(--stale); border-color:color-mix(in srgb, var(--stale) 40%, transparent); background:color-mix(in srgb, var(--stale) 8%, transparent); }
+.pcard-ready { font:400 10.5px var(--mono); color:var(--text3); margin-left:auto; }
+.pcard-sum { font-size:13px; color:var(--text2); margin-bottom:12px; max-width:62ch; }
+.pcard-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.pcard-lab { flex:none; width:76px; font-size:12px; color:var(--text3); }
+.pcard-in { flex:1; min-width:0; height:34px; padding:0 10px; background:var(--bg); border:1px solid var(--line); border-radius:8px; color:var(--text); font:400 13px var(--sans); }
+.pcard-in:focus { outline:none; border-color:var(--accent); }
+select.pcard-in { font-family:var(--sans); }
+.pcard-note { font-size:12px; color:var(--text3); margin:0 0 10px 86px; }
+.pcard-keystate { font:400 11px var(--mono); }
+.pcard-keystate.saved { color:var(--verified); }
+.pcard-keystate.env { color:var(--text2); }
+.pcard-link { color:var(--accent); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.pcard-hint { font-size:12px; color:var(--stale); margin:0 0 10px 86px; }
+.pcard-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+.btn-sm { border:1px solid var(--line); background:var(--bg); border-radius:8px; padding:6px 13px; font-size:12.5px; color:var(--text2); transition:all 120ms var(--ease); }
+.btn-sm:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.btn-sm.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn-sm.primary:hover:not(:disabled) { background:var(--accent-hover); color:#fff; }
+.btn-sm:disabled { opacity:.4; cursor:default; }
+.btn-sm.ghost { color:var(--text3); }
+.btn-sm.ghost:hover { border-color:var(--missing); color:var(--missing); }
+.rebuild { border:1px solid var(--accent); border-radius:10px; padding:12px 14px; background:var(--accent-soft); margin-bottom:4px; }
+.rebuild.err { border-color:var(--missing); background:color-mix(in srgb, var(--missing) 8%, transparent); }
+.rebuild-line { font-size:12.5px; color:var(--text2); margin-bottom:8px; overflow-wrap:anywhere; }
+.rebuild-bar { height:4px; background:var(--line); border-radius:999px; overflow:hidden; }
+.rebuild-fill { height:100%; width:0; background:var(--accent); transition:width 200ms var(--ease); }
+
 .fixwrap { max-width:800px; margin:0 auto; padding:30px 32px 80px; }
 .fix-intro { color:var(--text2); font-size:13.5px; max-width:68ch; margin:6px 0 20px; }
 .fixcard { background:var(--surface); border:1px solid var(--line); border-radius:11px; box-shadow:var(--shadow-sm); margin-bottom:10px; display:flex; gap:12px; align-items:flex-start; padding:13px 16px; }
@@ -215,6 +263,7 @@ textarea { font:inherit; color:inherit; }
       <button id="navAsk" class="active"><span class="ico">&#9906;</span> Ask</button>
       <button id="navLib"><span class="ico">&#10514;</span> Library</button>
       <button id="navFix"><span class="ico">&#9998;</span> Fixes</button>
+      <button id="navSet"><span class="ico">&#9881;</span> Models &amp; keys</button>
     </div>
     <div class="threads-label">Threads</div>
     <nav class="threads" id="threadList" aria-label="Threads"></nav>
@@ -421,11 +470,263 @@ textarea { font:inherit; color:inherit; }
     document.getElementById('navAsk').classList.toggle('active', state.view !== 'lib' && state.view !== 'fix');
     document.getElementById('navLib').classList.toggle('active', state.view === 'lib');
     document.getElementById('navFix').classList.toggle('active', state.view === 'fix');
+    document.getElementById('navSet').classList.toggle('active', state.view === 'set');
+    if (state.view === 'set') { view.appendChild(renderSettings()); return; }
     if (state.overview && state.overview.error) { view.appendChild(renderNoTree()); return; }
     if (state.view === 'lib') { view.appendChild(renderLibrary()); return; }
     if (state.view === 'fix') { view.appendChild(renderFixView()); return; }
     if (state.view === 'thread' && state.thread) { view.appendChild(renderThread()); return; }
     view.appendChild(renderHome());
+  }
+
+  /* ---- Models & keys ---- */
+  function renderSettings() {
+    var wrap = el('div', 'setwrap');
+    wrap.appendChild(el('h1', 'set-h1', 'Models & keys'));
+    wrap.appendChild(el('p', 'set-lede',
+      'OVERSTORY works with no model at all. Adding one buys prose summaries instead of your own doc comments. Everything else, including every receipt, is identical.'));
+
+    var status = el('div', 'set-status');
+    status.id = 'setStatus';
+    wrap.appendChild(status);
+
+    var list = el('div', 'set-list');
+    list.id = 'setList';
+    list.appendChild(el('div', 'set-loading', 'Checking what is available on this machine…'));
+    wrap.appendChild(list);
+
+    fetchJson('/api/providers').then(function (data) {
+      state.providers = data;
+      paintProviders();
+    }).catch(function (err) {
+      list.textContent = '';
+      list.appendChild(el('div', 'set-err', 'Could not read provider settings: ' + err.message));
+    });
+    return wrap;
+  }
+
+  function paintProviders() {
+    var list = document.getElementById('setList');
+    if (!list || !state.providers) return;
+    list.textContent = '';
+    var statusEl = document.getElementById('setStatus');
+    if (statusEl) {
+      statusEl.textContent = '';
+      statusEl.appendChild(el('span', 'set-active-label', 'Currently building with'));
+      statusEl.appendChild(el('code', 'set-active', state.providers.active));
+    }
+
+    state.providers.providers.forEach(function (p) {
+      var card = el('div', 'pcard' + (p.ready ? ' ready' : ''));
+      var head = el('div', 'pcard-head');
+      head.appendChild(el('span', 'pcard-name', p.label));
+      head.appendChild(el('span', 'pcard-priv' + (p.sendsCodeOffMachine ? ' off' : ' on'),
+        p.sendsCodeOffMachine ? 'sends your code to a third party' : 'stays on this machine'));
+      if (p.ready) head.appendChild(el('span', 'pcard-ready', 'ready'));
+      card.appendChild(head);
+      card.appendChild(el('p', 'pcard-sum', p.summary));
+
+      if (p.id === 'openai-compatible' || p.id === 'ollama') {
+        var urlRow = el('div', 'pcard-row');
+        urlRow.appendChild(el('label', 'pcard-lab', 'Endpoint'));
+        var urlIn = el('input', 'pcard-in');
+        urlIn.type = 'url';
+        urlIn.value = p.baseUrl || '';
+        urlIn.placeholder = 'https://…';
+        urlIn.id = 'url-' + p.id;
+        urlRow.appendChild(urlIn);
+        card.appendChild(urlRow);
+      }
+
+      if (p.needsKey || p.id === 'openai-compatible') {
+        var keyRow = el('div', 'pcard-row');
+        keyRow.appendChild(el('label', 'pcard-lab', 'API key'));
+        var keyIn = el('input', 'pcard-in');
+        keyIn.type = 'password';
+        keyIn.autocomplete = 'off';
+        keyIn.spellcheck = false;
+        keyIn.id = 'key-' + p.id;
+        keyIn.placeholder = p.keyStatus === 'none' ? 'paste your key' : 'saved — paste a new one to replace it';
+        keyRow.appendChild(keyIn);
+        card.appendChild(keyRow);
+
+        var note = el('div', 'pcard-note');
+        if (p.keyStatus === 'environment') {
+          note.appendChild(el('span', 'pcard-keystate env', 'set by ' + p.envVar + ' (' + p.keyHint + ')'));
+          note.appendChild(el('span', '', ' — the environment wins over anything saved here.'));
+        } else if (p.keyStatus === 'saved') {
+          note.appendChild(el('span', 'pcard-keystate saved', 'saved: ' + p.keyHint));
+        } else if (p.keyUrl) {
+          var a = el('a', 'pcard-link', 'get a key');
+          a.href = p.keyUrl;
+          a.target = '_blank';
+          a.rel = 'noreferrer';
+          note.appendChild(a);
+        }
+        card.appendChild(note);
+      }
+
+      if (p.models.length > 0) {
+        var modelRow = el('div', 'pcard-row');
+        modelRow.appendChild(el('label', 'pcard-lab', 'Model'));
+        var sel = el('select', 'pcard-in');
+        sel.id = 'model-' + p.id;
+        p.models.forEach(function (m) {
+          var o = el('option', '', m.label + (m.note ? ' — ' + m.note : ''));
+          o.value = m.id;
+          if (p.selectedModel === m.id) o.selected = true;
+          sel.appendChild(o);
+        });
+        modelRow.appendChild(sel);
+        card.appendChild(modelRow);
+      } else if (p.id === 'openai-compatible') {
+        var freeRow = el('div', 'pcard-row');
+        freeRow.appendChild(el('label', 'pcard-lab', 'Model'));
+        var freeIn = el('input', 'pcard-in');
+        freeIn.id = 'model-' + p.id;
+        freeIn.value = p.selectedModel || '';
+        freeIn.placeholder = 'exact model id from your provider';
+        freeRow.appendChild(freeIn);
+        card.appendChild(freeRow);
+      }
+
+      if (p.id === 'ollama' && !state.providers.ollama.reachable) {
+        card.appendChild(el('div', 'pcard-hint', 'Ollama is not running. Install it, then run: ollama pull qwen2.5:14b'));
+      }
+
+      var actions = el('div', 'pcard-actions');
+      if (p.needsKey || p.id === 'openai-compatible' || p.models.length > 0) {
+        var save = el('button', 'btn-sm', 'Save');
+        save.addEventListener('click', function () { saveProvider(p, save); });
+        actions.appendChild(save);
+      }
+      if (p.keyStatus === 'saved') {
+        var clear = el('button', 'btn-sm ghost', 'Forget key');
+        clear.addEventListener('click', function () { clearProvider(p.id); });
+        actions.appendChild(clear);
+      }
+      var useBtn = el('button', 'btn-sm primary', 'Rebuild with this');
+      useBtn.disabled = !p.ready;
+      useBtn.title = p.ready ? '' : 'Add a key first';
+      useBtn.addEventListener('click', function () { rebuildWith(p); });
+      actions.appendChild(useBtn);
+      card.appendChild(actions);
+      list.appendChild(card);
+    });
+
+    var foot = el('div', 'set-foot');
+    foot.appendChild(el('span', '', 'Keys are stored on this machine only, at '));
+    foot.appendChild(el('code', '', state.providers.credentialsPath));
+    foot.appendChild(el('span', '', '. They are never sent anywhere except to the provider you chose.'));
+    list.appendChild(foot);
+  }
+
+  function readProviderInputs(p) {
+    var keyEl = document.getElementById('key-' + p.id);
+    var modelEl = document.getElementById('model-' + p.id);
+    var urlEl = document.getElementById('url-' + p.id);
+    var body = { provider: p.id };
+    if (keyEl && keyEl.value.trim()) body.key = keyEl.value.trim();
+    if (modelEl && modelEl.value) body.model = modelEl.value;
+    if (urlEl && urlEl.value.trim()) body.baseUrl = urlEl.value.trim();
+    return body;
+  }
+
+  function saveProvider(p, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    fetch('/api/providers/key', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(readProviderInputs(p)),
+    }).then(function (r) { return r.json(); }).then(function (out) {
+      btn.disabled = false;
+      btn.textContent = 'Save';
+      if (out.error) { flashSettings(out.error, true); return null; }
+      flashSettings('Saved.', false);
+      return fetchJson('/api/providers').then(function (d) { state.providers = d; paintProviders(); });
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = 'Save';
+      flashSettings(e.message, true);
+    });
+  }
+
+  function clearProvider(id) {
+    fetch('/api/providers/key', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: id }),
+    }).then(function () {
+      return fetchJson('/api/providers');
+    }).then(function (d) {
+      state.providers = d;
+      paintProviders();
+      flashSettings('Key forgotten.', false);
+    });
+  }
+
+  function flashSettings(message, isError) {
+    var statusEl = document.getElementById('setStatus');
+    if (!statusEl) return;
+    var msg = el('span', 'set-flash' + (isError ? ' err' : ''), ' ' + message);
+    statusEl.appendChild(msg);
+    setTimeout(function () { if (msg.parentNode) msg.parentNode.removeChild(msg); }, 4000);
+  }
+
+  /* Rebuild in place, so a key you just pasted is useful without finding a terminal. */
+  function rebuildWith(p) {
+    var body = readProviderInputs(p);
+    var list = document.getElementById('setList');
+    var panel = el('div', 'rebuild');
+    var line = el('div', 'rebuild-line', 'Starting…');
+    var bar = el('div', 'rebuild-bar');
+    var fill = el('div', 'rebuild-fill');
+    bar.appendChild(fill);
+    panel.appendChild(line);
+    panel.appendChild(bar);
+    if (list) list.insertBefore(panel, list.firstChild);
+
+    fetch('/api/rebuild', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: p.id, model: body.model }),
+    }).then(function (res) {
+      var reader = res.body.getReader();
+      var dec = new TextDecoder();
+      var buf = '';
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return null;
+          buf += dec.decode(r.value, { stream: true });
+          var parts = buf.split('\\n\\n');
+          buf = parts.pop();
+          parts.forEach(function (block) {
+            var evLine = block.split('\\n').find(function (l) { return l.indexOf('event: ') === 0; });
+            var dataLine = block.split('\\n').find(function (l) { return l.indexOf('data: ') === 0; });
+            if (!evLine || !dataLine) return;
+            var name = evLine.slice(7).trim();
+            var d = JSON.parse(dataLine.slice(6));
+            if (name === 'start') line.textContent = 'Building with ' + d.provider + '…';
+            else if (name === 'progress' && d.total) {
+              line.textContent = 'Summarizing ' + d.done + ' of ' + d.total + '  ' + (d.file || '');
+              fill.style.width = Math.round((d.done / d.total) * 100) + '%';
+            } else if (name === 'progress') line.textContent = 'Verifying every receipt…';
+            else if (name === 'error') { line.textContent = 'Failed: ' + d.message; panel.classList.add('err'); }
+            else if (name === 'done') {
+              fill.style.width = '100%';
+              line.textContent = 'Done — ' + d.claims + ' claims across ' + d.nodes + ' nodes, ' + freshPct(d.freshness) + '% verified, using ' + d.provider + '.';
+              fetchJson('/api/overview').then(function (o) { state.overview = o; renderSidebarMeta(); });
+            }
+          });
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (e) {
+      line.textContent = 'Failed: ' + e.message;
+      panel.classList.add('err');
+    });
   }
 
   function renderFixView() {
@@ -790,6 +1091,7 @@ textarea { font:inherit; color:inherit; }
   });
   document.getElementById('navLib').addEventListener('click', function () { state.view = 'lib'; render(); });
   document.getElementById('navFix').addEventListener('click', function () { state.view = 'fix'; render(); });
+  document.getElementById('navSet').addEventListener('click', function () { state.view = 'set'; render(); });
   document.getElementById('menuBtn') && document.getElementById('menuBtn').addEventListener('click', function () {
     document.getElementById('side').classList.toggle('open');
   });

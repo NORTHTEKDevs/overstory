@@ -53,3 +53,17 @@ export const ollamaReachable = async (baseUrl = 'http://localhost:11434'): Promi
     return false;
   }
 };
+
+/** Models actually pulled on this machine. The settings panel offers these rather than a
+ * fixed list, because suggesting a model the user has not downloaded produces a confusing
+ * failure several minutes into a build. Returns [] when Ollama is not running. */
+export const ollamaModels = async (baseUrl = process.env.OVERSTORY_OLLAMA_URL ?? 'http://localhost:11434'): Promise<string[]> => {
+  try {
+    const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(3_000) });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { models?: Array<{ name?: string }> };
+    return (body.models ?? []).map((m) => m.name).filter((n): n is string => typeof n === 'string').sort();
+  } catch {
+    return [];
+  }
+};

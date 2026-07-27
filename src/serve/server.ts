@@ -9,8 +9,45 @@ import type { ChatProvider } from '../llm/provider.js';
 import { ask, buildClaimIndex } from '../query/ask.js';
 import { notarizeClaims } from '../query/notarize.js';
 import { buildSiteData } from '../site/data.js';
+import { buildTree } from '../build/builder.js';
+import { resolveProviders } from '../llm/resolve.js';
 import { appHtml } from './app.js';
 import { ThreadStore } from './threads.js';
+import { PROVIDER_CATALOG, findProvider, looksLikeKey } from '../llm/catalog.js';
+import { clearCredential, credentialsPath, maskKey, readCredentials, saveCredential } from '../core/credentials.js';
+import { ollamaModels } from '../llm/ollama.js';
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+/** Reject anything that did not come from this machine's own loopback name.
+ *
+ * Returns an error string when the request must be refused, or null to allow it. Exported so
+ * the behaviour is testable directly rather than only through a live socket. */
+export const localRequestError = (req: { headers: IncomingMessage['headers'] }): string | null => {
+  const host = req.headers.host ?? '';
+  const hostname = host.replace(/:\d+$/u, '').toLowerCase();
+  if (!LOCAL_HOSTS.has(hostname)) {
+    return `refused: this server only answers requests addressed to localhost (got "${host}")`;
+  }
+  const origin = req.headers.origin;
+  if (typeof origin === 'string' && origin.length > 0) {
+    let originHost: string;
+    try {
+      originHost = new URL(origin).hostname.toLowerCase();
+    } catch {
+      return 'refused: malformed Origin header';
+    }
+    if (!LOCAL_HOSTS.has(originHost)) return `refused: cross-origin request from ${origin}`;
+  }
+  return null;
+};
+
+const providerKeySchema = z.object({
+  provider: z.string().min(1).max(50),
+  key: z.string().max(500).optional(),
+  model: z.string().max(200).optional(),
+  baseUrl: z.string().url().max(500).optional(),
+});
 
 const askBodySchema = z.object({
   question: z.string().min(2).max(2000),
@@ -78,6 +115,7 @@ const suggestionsFor = (tree: Tree): string[] => {
 export const createOverstoryHttpServer = (root: string, opts: ServeOptions): Server => {
   const threads = new ThreadStore(root);
   let cached: LoadedState | null = null;
+  let rebuilding = false;
 
   const load = async (): Promise<LoadedState | null> => {
     let mtimeMs = 0;
@@ -103,6 +141,12 @@ export const createOverstoryHttpServer = (root: string, opts: ServeOptions): Ser
     const url = new URL(req.url ?? '/', 'http://localhost');
     const route = `${req.method} ${url.pathname}`;
     try {
+      // Binding to 127.0.0.1 stops other machines reaching this, but not other *pages*: any
+      // site open in the browser can issue requests to localhost, and DNS rebinding lets an
+      // attacker-controlled name resolve here. With API keys reachable through this server
+      // that is a credential-theft path, so require a local Host and reject foreign Origins.
+      const guard = localRequestError(req);
+      if (guard) return sendJson(res, 403, { error: guard });
       if (route === 'GET /') {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(appHtml());
@@ -124,6 +168,108 @@ export const createOverstoryHttpServer = (root: string, opts: ServeOptions): Ser
           nodes: Object.keys(tree.nodes).length,
           suggestions: suggestionsFor(tree),
         });
+      }
+
+      if (route === 'GET /api/providers') {
+        const stored = readCredentials();
+        const installed = await ollamaModels();
+        return sendJson(res, 200, {
+          active: opts.provider?.name ?? 'none',
+          providers: PROVIDER_CATALOG.map((p) => {
+            const envKey = p.envVar ? process.env[p.envVar] : undefined;
+            const fileKey = stored.keys[p.id];
+            return {
+              id: p.id,
+              label: p.label,
+              summary: p.summary,
+              sendsCodeOffMachine: p.sendsCodeOffMachine,
+              needsKey: p.needsKey,
+              envVar: p.envVar,
+              keyUrl: p.keyUrl,
+              baseUrl: stored.baseUrls?.[p.id] ?? p.baseUrlDefault,
+              selectedModel: stored.models?.[p.id],
+              // Never the key itself: only whether one exists, where it came from, and
+              // enough characters to recognise which key it is.
+              keyStatus: envKey ? 'environment' : fileKey ? 'saved' : 'none',
+              keyHint: envKey ? maskKey(envKey) : fileKey ? maskKey(fileKey) : null,
+              ready: p.id === 'none' || (p.id === 'ollama' ? installed.length > 0 : Boolean(envKey ?? fileKey) || !p.needsKey),
+              models: p.id === 'ollama' && installed.length > 0
+                ? installed.map((id) => ({ id, label: id }))
+                : p.models,
+            };
+          }),
+          ollama: { reachable: installed.length > 0, installed },
+          credentialsPath: credentialsPath(),
+        });
+      }
+
+      if (route === 'POST /api/providers/key') {
+        const body = providerKeySchema.parse(await readBody(req));
+        if (!findProvider(body.provider)) return sendJson(res, 400, { error: 'unknown provider' });
+        if (body.key !== undefined) {
+          const check = looksLikeKey(body.provider, body.key);
+          if (!check.ok) return sendJson(res, 400, { error: check.reason });
+        }
+        saveCredential(body.provider, {
+          key: body.key?.trim(),
+          model: body.model,
+          baseUrl: body.baseUrl,
+        });
+        return sendJson(res, 200, { saved: true, storedAt: credentialsPath() });
+      }
+
+      if (route === 'POST /api/rebuild') {
+        // Pasting a key that does nothing until you find your terminal again is not a
+        // setting, it is a chore. Rebuild here, streaming progress, and drop the cache so
+        // the next read serves the new tree.
+        const body = z.object({ provider: z.string().optional(), model: z.string().optional() }).parse(await readBody(req));
+        res.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-cache',
+          connection: 'keep-alive',
+        });
+        const send = (event: string, data: unknown): void => {
+          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        };
+        if (rebuilding) {
+          send('error', { message: 'a rebuild is already running' });
+          res.end();
+          return;
+        }
+        rebuilding = true;
+        try {
+          const { provider, critic } = await resolveProviders({ provider: body.provider, model: body.model });
+          send('start', { provider: provider?.name ?? 'extractive (no LLM)' });
+          const result = await buildTree(root, {
+            provider,
+            critic,
+            onProgress: (e) => {
+              if (e.phase === 'leaves' && e.total) send('progress', { done: e.done ?? 0, total: e.total, file: e.file ?? '' });
+              else if (e.phase === 'verify') send('progress', { phase: 'verifying' });
+              else if (e.phase === 'warn') send('warn', { message: e.message ?? '' });
+            },
+          });
+          cached = null;
+          opts.provider = provider;
+          send('done', {
+            nodes: Object.keys(result.tree.nodes).length,
+            claims: result.verification.verdicts.size,
+            freshness: result.verification.freshness,
+            provider: provider?.name ?? 'extractive (no LLM)',
+          });
+        } catch (err) {
+          send('error', { message: err instanceof Error ? err.message : String(err) });
+        } finally {
+          rebuilding = false;
+          res.end();
+        }
+        return;
+      }
+
+      if (route === 'DELETE /api/providers/key') {
+        const body = z.object({ provider: z.string() }).parse(await readBody(req));
+        clearCredential(body.provider);
+        return sendJson(res, 200, { cleared: true });
       }
 
       if (route === 'GET /api/tree') {
