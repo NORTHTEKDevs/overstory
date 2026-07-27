@@ -38,9 +38,17 @@ and their text is unchanged since the claim was written. It does not prove the c
 such. Treat a `VERIFIED` verdict as "this citation is real and current," not "this statement
 is correct."
 
-The `serve` app binds to `127.0.0.1` and is intended for local use. It has no authentication;
-do not expose it to a network you do not control. It loads webfonts from Google, being a local
-app you chose to run; the shareable `site` export deliberately does not.
+The `serve` app binds to `127.0.0.1` and is intended for local use. It has no authentication,
+so do not expose it to a network you do not control. It does refuse requests whose `Host` is
+not a loopback name and requests carrying a foreign `Origin`, which blocks the DNS-rebinding
+path by which a web page you have open could otherwise reach it. It loads webfonts from
+Google, being a local app you chose to run; the shareable `site` export deliberately does not.
+
+API keys entered in the app are written to `~/.overstory/credentials.json` with mode `0600` —
+never inside a project, because a project's `.overstory/` holds the `tree.json` this project
+tells people to commit. A saved key is never returned by the local API; the settings panel
+receives only a masked hint such as `sk-ant…4f2a`. Environment variables take precedence over
+saved keys, so a key set deliberately by an operator is never silently overridden.
 
 There is no hosted service. Nothing in this project uploads your code, and the only outbound
 request it can make is to an LLM provider you configured yourself — Ollama on your own machine

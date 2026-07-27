@@ -13,6 +13,9 @@ import { buildSiteData } from '../site/data.js';
 import { generateSiteHtml } from '../site/generate.js';
 import { freshnessPct, verifyTree } from '../core/gate.js';
 import { packageVersion } from '../core/version.js';
+import { PROVIDER_CATALOG } from '../llm/catalog.js';
+import { credentialsPath, maskKey, readCredentials } from '../core/credentials.js';
+import { ollamaModels } from '../llm/ollama.js';
 
 const HELP = `overstory — a knowledge tree of your codebase where every claim carries a receipt.
 Local-first: nothing leaves this machine.
@@ -25,6 +28,7 @@ Usage:
   overstory fix    [path]   Paste-ready fix prompts for your agent, grounded in receipts
   overstory site   [path]   Export the shareable single-file explorer
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
+  overstory providers       Show available models and APIs, and where your keys are
 
 Options:
   --provider <auto|ollama|anthropic|none>   LLM for summaries (default auto; none = extractive)
@@ -99,6 +103,36 @@ const main = async (): Promise<number> => {
 
   if (cmd === 'help') {
     process.stdout.write(HELP);
+    return 0;
+  }
+
+  if (cmd === 'providers') {
+    const stored = readCredentials();
+    const installed = await ollamaModels();
+    const rows = PROVIDER_CATALOG.map((p) => {
+      const envKey = p.envVar ? process.env[p.envVar] : undefined;
+      const fileKey = stored.keys[p.id];
+      const key = envKey ?? fileKey;
+      return {
+        id: p.id,
+        label: p.label,
+        privacy: p.sendsCodeOffMachine ? 'sends code off this machine' : 'stays on this machine',
+        keyStatus: envKey ? `set via ${p.envVar}` : fileKey ? `saved (${maskKey(fileKey)})` : p.needsKey ? 'no key' : 'no key needed',
+        ready: p.id === 'ollama' ? installed.length > 0 : Boolean(key) || !p.needsKey,
+        models: p.id === 'ollama' ? installed : p.models.map((m) => m.id),
+      };
+    });
+    if (flags.json) {
+      process.stdout.write(`${JSON.stringify({ providers: rows, credentialsPath: credentialsPath() }, null, 2)}\n`);
+      return 0;
+    }
+    for (const r of rows) {
+      process.stdout.write(`${r.ready ? '  ✓' : '  ·'} ${r.label}\n`);
+      process.stdout.write(`      ${r.privacy} · ${r.keyStatus}\n`);
+      if (r.models.length > 0) process.stdout.write(`      models: ${r.models.slice(0, 6).join(', ')}${r.models.length > 6 ? ', …' : ''}\n`);
+    }
+    process.stdout.write(`\n  Set a key: overstory serve → Models & keys, or export the environment variable.\n`);
+    process.stdout.write(`  Keys are stored at ${credentialsPath()} and never leave this machine except to the provider you pick.\n`);
     return 0;
   }
 

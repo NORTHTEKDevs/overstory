@@ -6,6 +6,46 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-27
+
+Bring your own key, without leaving the app.
+
+### Added
+
+- **Models & keys panel** in `overstory serve`. Shows every provider, whether it keeps your
+  code on the machine, whether it is ready to use, and which models are available — Ollama's
+  list is read live from what you have actually pulled, so it never suggests a model you would
+  have to wait several minutes to discover you do not have. Paste a key, pick a model, and
+  **rebuild in place** with streamed progress; a key that does nothing until you find your
+  terminal again is not a setting, it is a chore.
+- **`overstory providers`** prints the same information, with `--json` for scripts.
+- **OpenAI-compatible provider.** One implementation covers OpenAI, OpenRouter, Groq,
+  Together, Fireworks, DeepInfra, LM Studio, llama.cpp, and vLLM — set a base URL and a model
+  id. Local endpoints may omit the key entirely.
+- **Anthropic and OpenAI catalogs**: Claude Haiku 4.5 / Sonnet 5 / Opus 5, GPT-5 mini / GPT-5.
+
+### Security
+
+- **Keys are stored in `~/.overstory/credentials.json`, mode `0600` — never in the project.**
+  A project's `.overstory/` holds the `tree.json` this project tells people to commit, and a
+  credentials file next to it is an accident waiting to happen. Keys are per-person anyway.
+- **A saved key is never readable back through the local API.** The panel receives a masked
+  hint and nothing more.
+- **The local server now refuses non-loopback `Host` headers and foreign `Origin`s.** Binding
+  to `127.0.0.1` stops other machines, not other *pages*: any site open in your browser can
+  issue requests to localhost, and DNS rebinding lets an attacker-controlled name resolve
+  there. With credentials reachable through this server that is a theft path, so both are
+  checked on every route.
+- Environment variables take precedence over saved keys, so a deliberately-set key is never
+  silently overridden.
+
+### Fixed
+
+- The app shell's inline JavaScript had no test that it parses. The file is a single
+  TypeScript template literal, where a stray backtick ends the template and a bare `\n`
+  becomes a real newline inside a JS string — both compile cleanly and both produce a blank
+  page. Now asserted.
+
 ## [0.3.0] - 2026-07-27
 
 The no-LLM path is now the good path. Previously a build without a model produced claims like
@@ -111,7 +151,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.1.0...v0.1.1

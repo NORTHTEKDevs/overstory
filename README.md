@@ -43,9 +43,30 @@ other and the gate catches it. That much works with zero AI involved. Point it a
 Ollama model or the Anthropic API and the same tree gets prose summaries instead — same gate,
 same receipts, your choice of how much machine you want in the loop.
 
-Local-first by default: with Ollama or the deterministic engine, your code never leaves your
-machine — air-gapped works. The Anthropic API is an explicit opt-in, and only then does source
-text leave the machine. The gate itself is always local.
+## Models and APIs
+
+Run `overstory providers` to see what is available on your machine, or open
+`overstory serve` → **Models & keys** to paste a key and rebuild without touching a terminal.
+
+| Provider | Your code leaves the machine? | Key | Models |
+|---|---|---|---|
+| **Built-in** (default) | No | none | none — claims come from your doc comments and signatures |
+| **Ollama** | No | none | whatever you have pulled; `qwen2.5:14b` is a good default |
+| **Anthropic** | Yes | `ANTHROPIC_API_KEY` | Claude Haiku 4.5, Sonnet 5, Opus 5 |
+| **OpenAI** | Yes | `OPENAI_API_KEY` | GPT-5 mini, GPT-5 |
+| **Any OpenAI-compatible endpoint** | Yes | optional | OpenRouter, Groq, Together, Fireworks, DeepInfra, LM Studio, llama.cpp, vLLM — set the base URL and model id |
+
+Keys pasted into the app are written to `~/.overstory/credentials.json` with owner-only
+permissions. They are never stored in your repository, never sent anywhere except the provider
+you picked, and never returned by the local API once saved — the settings panel only ever sees
+a masked hint. An environment variable always wins over a saved key.
+
+The gate is always local, whichever provider you choose. Verification is hashing, not
+inference, so it costs nothing and works offline even when the summaries did not.
+
+Local-first by default: with Ollama or the built-in engine, your code never leaves your
+machine — air-gapped works. A hosted API is an explicit opt-in, and only then does source
+text leave the machine.
 
 ```
 npx @northtek/overstory build     # build the tree (resumable; reuses unchanged files)
