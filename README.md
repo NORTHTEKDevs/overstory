@@ -40,8 +40,16 @@ structure and doc comments, so a documented function becomes a claim you can che
 
 The receipt cites the comment *and* the signature as one span. Change either without the
 other and the gate catches it. That much works with zero AI involved. Point it at a local
-Ollama model or the Anthropic API and the same tree gets prose summaries instead — same gate,
+Ollama model or a hosted API and the same tree gets prose summaries instead — same gate,
 same receipts, your choice of how much machine you want in the loop.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/NORTHTEKDevs/overstory/master/docs/images/receipt.png" alt="The claim ledger for src/core/store.ts. Every row carries a verified seal, and one claim is unfolded to show its receipt: the file and line range, a sha256 of the cited text, and the source line itself." width="900">
+</p>
+
+<p align="center"><em>Click any claim and it unfolds into the exact lines that prove it, with the
+hash of the text that was cited. Nothing here is decorative — every seal was computed against
+the code on disk.</em></p>
 
 ## Models and APIs
 
@@ -55,6 +63,14 @@ Run `overstory providers` to see what is available on your machine, or open
 | **Anthropic** | Yes | `ANTHROPIC_API_KEY` | Claude Haiku 4.5, Sonnet 5, Opus 5 |
 | **OpenAI** | Yes | `OPENAI_API_KEY` | GPT-5 mini, GPT-5 |
 | **Any OpenAI-compatible endpoint** | Yes | optional | OpenRouter, Groq, Together, Fireworks, DeepInfra, LM Studio, llama.cpp, vLLM — set the base URL and model id |
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/NORTHTEKDevs/overstory/master/docs/images/models-and-keys.png" alt="The Models and keys panel: each provider states whether your code stays on the machine, whether it is ready to use, and which models are available. Ollama's list is read from the models actually installed." width="900">
+</p>
+
+Every provider says plainly whether your code stays on the machine. Ollama's model list is
+read from what you have actually pulled, and **Rebuild with this** applies a change without
+sending you back to a terminal.
 
 Keys pasted into the app are written to `~/.overstory/credentials.json` with owner-only
 permissions. They are never stored in your repository, never sent anywhere except the provider
@@ -76,10 +92,14 @@ npx @northtek/overstory mcp       # MCP tools for Claude Code / Cursor
 npx @northtek/overstory site      # shareable single-file explorer
 ```
 
-**The app** (`overstory serve`) is a local, frontier-lab-grade answer engine over your repo:
-ask-first home, streamed phases (searching → writing → notarizing), answers with numbered
-citation chips, and receipt cards that unfold into the exact cited lines with their hash and
-verdict seal. Threads persist locally; light and dark themes; nothing leaves your machine.
+**The app** (`overstory serve`) is a local answer engine over your repo: ask-first home,
+streamed phases (searching → writing → notarizing), answers with numbered citation chips, and
+receipt cards that unfold into the exact cited lines with their hash and verdict seal. Threads
+persist locally; light and dark themes; nothing leaves your machine.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/NORTHTEKDevs/overstory/master/docs/images/app.png" alt="The OVERSTORY app: an ask-first home over the repository, with the current freshness and active provider shown in the sidebar." width="900">
+</p>
 
 ## Why
 
