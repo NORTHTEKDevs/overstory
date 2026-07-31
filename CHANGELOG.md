@@ -6,6 +6,33 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-31
+
+Git history, fused with the verification state — the one combination that needs both halves.
+
+### Added
+
+- **`overstory insight`**: documentation risk, hotspots, single-owner files, and co-change
+  coupling, all counted from `git log`. The risk list is the novel part: it crosses churn with
+  whether a file's claims still verify, so it answers "what should I read or document first"
+  rather than "what changed most", which git alone already tells you.
+- **`overstory_insight` and `overstory_file_history` MCP tools**, taking the server from four
+  tools to six. An agent about to edit an unfamiliar file can now ask who owns it, how much it
+  moves, and what it moves with.
+- Coupling ignores sweeping commits (a formatting pass across 80 files implies no real
+  relationship between them), and every ranking is filtered to files that still exist — git
+  remembers deletions, readers do not care about them.
+
+### Notes on honesty
+
+The risk score is a ranking heuristic, not a defect predictor. It was not fitted to any
+corpus, and presenting a hand-chosen weighting as a validated model would be exactly the kind
+of confident-but-unearned claim this project exists to catch. Every row prints the reasons
+that produced it.
+
+Ownership findings are suppressed entirely below three contributors: in a solo repository
+"100% owned by X" is true of every file and says nothing about the code.
+
 ### Added
 
 - **Standalone binaries.** A release now publishes single-file executables for Linux, macOS
@@ -173,7 +200,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.2.0...v0.3.0

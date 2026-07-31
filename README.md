@@ -113,6 +113,7 @@ npx @northtek/overstory serve     # open the app: ask your codebase, answers not
 npx @northtek/overstory verify    # CI-friendly: exit 1 if any receipt fails
 npx @northtek/overstory mcp       # MCP tools for Claude Code / Cursor
 npx @northtek/overstory site      # shareable single-file explorer
+npx @northtek/overstory insight   # hotspots, ownership, coupling, documentation risk
 ```
 
 **The app** (`overstory serve`) is a local answer engine over your repo: ask-first home,
@@ -172,10 +173,39 @@ For a repository, committing `.overstory/tree.json` and adding `overstory verify
 the durable version: reviewers see the claims in the diff, and the build fails when merged
 code stales them.
 
+## Where to look first
+
+`overstory insight` crosses two things nothing else has together: git knows which files are
+moving and who moves them, and the tree knows which files are described and whether those
+descriptions still hold.
+
+```console
+$ npx @northtek/overstory insight
+
+  DOCUMENTATION RISK — active code whose docs are missing or no longer verify
+     55  src/core/corpus.ts
+         1 of 8 claims no longer verify · actively changed (4 commits)
+
+  HOTSPOTS — most change, weighted toward recent work
+      12 commits  README.md  (last 2026-07-31, 1 author)
+
+  CHANGES TOGETHER — edit one, check the other
+    100%  tests/site.test.ts → src/site/generate.ts  (5x)
+```
+
+A busy file whose docs all verify is not on that risk list — it is just busy, and that is what
+hotspots are for. The list only contains files with an actual documentation problem, ranked by
+how much the code is moving underneath it.
+
+**These are counts, not predictions.** Every number comes from `git log` and the gate; nothing
+is modelled, nothing was fitted to a defect corpus, and the score is a way to sort a list
+rather than a measurement of anything. Each row prints its reasons so you can disagree with
+it on the evidence.
+
 ## MCP: notarize your agent's answers
 
-`overstory mcp` exposes `overstory_map`, `overstory_search`, `overstory_node`, and the tool
-the others exist for — **`overstory_verify`**: your agent (Claude Code, Cursor) drafts an
+`overstory mcp` exposes `overstory_map`, `overstory_search`, `overstory_node`,
+`overstory_insight`, `overstory_file_history`, and the tool the others exist for — **`overstory_verify`**: your agent (Claude Code, Cursor) drafts an
 answer about the repo, submits its claims with file:line citations, and gets back per-claim
 verdicts plus the receipt text for each citation. The host model does the thinking;
 OVERSTORY checks the receipts.

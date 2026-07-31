@@ -4,6 +4,8 @@ import { loadCorpus } from '../core/corpus.js';
 import { verifyTree } from '../core/gate.js';
 import { loadTree, treePath } from '../core/store.js';
 import { packageVersion } from '../core/version.js';
+import { readHistory } from '../git/history.js';
+import { documentationRisk, hotspots, knowledgeConcentration } from '../git/risk.js';
 import { buildClaimIndex } from '../query/ask.js';
 import { notarizeClaims } from '../query/notarize.js';
 import type { CorpusSnapshot, Tree } from '../core/types.js';
@@ -52,6 +54,59 @@ export const createOverstoryServer = (root: string): McpServer => {
           const counts = verification.byNode.get(id);
           return { id, path: n.path, kind: n.kind, summary: n.summary, claims: counts?.total ?? 0, verified: counts?.verified ?? 0 };
         }),
+      });
+    },
+  );
+
+  server.registerTool(
+    'overstory_insight',
+    {
+      description:
+        'Where documentation debt meets active development, counted from git history and the verification state of the tree. Returns: documentation risk (files whose claims no longer verify or that have none, weighted by recent churn), hotspots (most-changed files), single-owner files, and co-change coupling (edit one, check the other). Every number is counted from git, not modelled — use it to decide what to read or document first, not to predict defects.',
+      inputSchema: {
+        limit: z.number().int().min(1).max(50).optional().describe('Rows per section (default 10)'),
+      },
+    },
+    async ({ limit }) => {
+      const loaded = await load();
+      if (!loaded) return jsonError(NEEDS_BUILD);
+      const { tree, corpus } = loaded;
+      const history = await readHistory(root);
+      if (!history.available) {
+        return jsonError(`No git history available${history.reason ? `: ${history.reason}` : ''}. This tool needs a git repository.`);
+      }
+      const n = limit ?? 10;
+      const live = new Set(corpus.files.keys());
+      const verification = verifyTree(tree, corpus);
+      return json({
+        commitsRead: history.commitsRead,
+        documentationRisk: documentationRisk(tree, verification, history, { limit: n }),
+        hotspots: hotspots(history, n, live),
+        singleOwnerFiles: knowledgeConcentration(history, n, live),
+        changesTogether: history.coupling.filter((c) => live.has(c.file) && live.has(c.partner)).slice(0, n),
+      });
+    },
+  );
+
+  server.registerTool(
+    'overstory_file_history',
+    {
+      description:
+        'Git history for one file: commit count, recency-weighted churn, the authors who touched it, ownership concentration, when it last changed, and the files it most often changes with. Useful before editing an unfamiliar file, or to find who to ask.',
+      inputSchema: { path: z.string().describe('Repo-relative file path') },
+    },
+    async ({ path }) => {
+      const history = await readHistory(root);
+      if (!history.available) {
+        return jsonError(`No git history available${history.reason ? `: ${history.reason}` : ''}.`);
+      }
+      const normalized = path.replace(/\\/gu, '/').replace(/^\.\//u, '');
+      const entry = history.files.get(normalized);
+      if (!entry) return jsonError(`No history for "${normalized}" in the last ${history.commitsRead} commits.`);
+      return json({
+        ...entry,
+        lastChanged: entry.lastChangedAt ? new Date(entry.lastChangedAt * 1000).toISOString() : null,
+        changesWith: history.coupling.filter((c) => c.file === normalized).slice(0, 10),
       });
     },
   );

@@ -16,6 +16,8 @@ import { packageVersion } from '../core/version.js';
 import { PROVIDER_CATALOG } from '../llm/catalog.js';
 import { credentialsPath, maskKey, readCredentials } from '../core/credentials.js';
 import { ollamaModels } from '../llm/ollama.js';
+import { readHistory } from '../git/history.js';
+import { documentationRisk, hotspots, knowledgeConcentration } from '../git/risk.js';
 
 const HELP = `overstory — a knowledge tree of your codebase where every claim carries a receipt.
 Local-first: nothing leaves this machine.
@@ -28,6 +30,7 @@ Usage:
   overstory fix    [path]   Paste-ready fix prompts for your agent, grounded in receipts
   overstory site   [path]   Export the shareable single-file explorer
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
+  overstory insight [path]  Hotspots, ownership, coupling, and documentation risk (from git)
   overstory providers       Show available models and APIs, and where your keys are
 
 Options:
@@ -103,6 +106,68 @@ const main = async (): Promise<number> => {
 
   if (cmd === 'help') {
     process.stdout.write(HELP);
+    return 0;
+  }
+
+  if (cmd === 'insight') {
+    const tree = await loadTree(treePath(root));
+    if (!tree) {
+      log('No tree found. Run: overstory build');
+      return 2;
+    }
+    const corpus = await loadCorpus(root, tree.corpusOptions ?? {});
+    const verification = verifyTree(tree, corpus);
+    const history = await readHistory(root);
+    if (!history.available) {
+      log(`No git history here${history.reason ? ` (${history.reason})` : ''} — insight needs a git repository.`);
+      return 2;
+    }
+    // Only rank files that still exist: git remembers deletions, readers do not care.
+    const live = new Set(corpus.files.keys());
+    const risk = documentationRisk(tree, verification, history);
+    const hot = hotspots(history, 10, live);
+    const concentrated = knowledgeConcentration(history, 8, live);
+
+    if (flags.json) {
+      process.stdout.write(`${JSON.stringify({ commitsRead: history.commitsRead, risk, hotspots: hot, knowledgeConcentration: concentrated, coupling: history.coupling.slice(0, 20) }, null, 2)}\n`);
+      return 0;
+    }
+
+    const when = (at: number | null): string => (at ? new Date(at * 1000).toISOString().slice(0, 10) : '—');
+    process.stdout.write(`\n  Read ${history.commitsRead} commits across ${history.files.size} files.\n`);
+
+    process.stdout.write(`\n  DOCUMENTATION RISK — active code whose docs are missing or no longer verify\n`);
+    if (risk.length === 0) process.stdout.write('    nothing flagged.\n');
+    for (const r of risk.slice(0, 10)) {
+      process.stdout.write(`    ${String(r.score).padStart(3)}  ${r.file}\n`);
+      process.stdout.write(`         ${r.reasons.join(' · ')}\n`);
+    }
+
+    process.stdout.write(`\n  HOTSPOTS — most change, weighted toward recent work\n`);
+    for (const h of hot) {
+      process.stdout.write(`    ${String(h.commits).padStart(4)} commits  ${h.file}  (last ${when(h.lastChangedAt)}, ${h.authors.length} author${h.authors.length === 1 ? '' : 's'})\n`);
+    }
+
+    if (concentrated.length > 0) {
+      process.stdout.write(`\n  SINGLE-OWNER FILES — one person holds most of the history\n`);
+      for (const h of concentrated) {
+        process.stdout.write(`    ${Math.round(h.ownershipConcentration * 100)}%  ${h.file}  (${h.topAuthor})\n`);
+      }
+    }
+
+    if (history.coupling.length > 0) {
+      process.stdout.write(`\n  CHANGES TOGETHER — edit one, check the other\n`);
+      const seen = new Set<string>();
+      for (const c of history.coupling) {
+        if (seen.has(c.file) || c.ratio < 0.5) continue;
+        if (!live.has(c.file) || !live.has(c.partner)) continue;
+        seen.add(c.file);
+        process.stdout.write(`    ${Math.round(c.ratio * 100)}%  ${c.file} → ${c.partner}  (${c.together}x)\n`);
+        if (seen.size >= 8) break;
+      }
+    }
+
+    process.stdout.write(`\n  Every number above is counted from git, not modelled. Scores rank; they do not predict.\n`);
     return 0;
   }
 
