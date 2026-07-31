@@ -84,6 +84,29 @@ Local-first by default: with Ollama or the built-in engine, your code never leav
 machine — air-gapped works. A hosted API is an explicit opt-in, and only then does source
 text leave the machine.
 
+## Install
+
+**No Node?** Download a standalone binary from
+[Releases](https://github.com/NORTHTEKDevs/overstory/releases) — one file, nothing to install,
+no runtime required. Linux, macOS (Intel and Apple Silicon), and Windows.
+
+```bash
+# macOS / Linux
+curl -fsSL -o overstory https://github.com/NORTHTEKDevs/overstory/releases/latest/download/overstory-macos-arm64
+chmod +x overstory && ./overstory build
+```
+
+**Have Node 20+?**
+
+```bash
+npx @northtek/overstory build        # no install
+npm install -g @northtek/overstory   # or keep it around
+```
+
+Verify any download against `SHA256SUMS.txt` on the release.
+
+## Commands
+
 ```
 npx @northtek/overstory build     # build the tree (resumable; reuses unchanged files)
 npx @northtek/overstory serve     # open the app: ask your codebase, answers notarized

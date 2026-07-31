@@ -6,6 +6,19 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Standalone binaries.** A release now publishes single-file executables for Linux, macOS
+  (Intel and Apple Silicon) and Windows, built with `bun build --compile` and checksummed.
+  Requiring Node was a real barrier for a tool whose whole pitch is that it runs anywhere with
+  no setup; now you download one file and run it.
+
+### Fixed
+
+- `--version` reported `unknown` in a compiled binary, and the MCP handshake would have
+  advertised the same. A single-file executable has no `package.json` on disk to read, so the
+  version is injected at bundle time and falls back to the file read under Node.
+
 ## [0.4.1] - 2026-07-27
 
 ### Changed

@@ -1,0 +1,88 @@
+name: Release
+
+# Standalone binaries for people who do not have Node and should not need it.
+# Triggered by pushing a version tag; also runnable by hand for a dry run.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    name: build standalone binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: read version
+        id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # bun cross-compiles every target from one runner, so the matrix is a loop rather
+      # than four jobs. The version is injected at bundle time because a compiled binary
+      # has no package.json to read.
+      - name: compile
+        run: |
+          mkdir -p dist-bin
+          set -euo pipefail
+          for target in \
+            "bun-linux-x64:overstory-linux-x64" \
+            "bun-linux-arm64:overstory-linux-arm64" \
+            "bun-darwin-x64:overstory-macos-x64" \
+            "bun-darwin-arm64:overstory-macos-arm64" \
+            "bun-windows-x64:overstory-windows-x64.exe"
+          do
+            t="${target%%:*}"; out="${target##*:}"
+            echo "::group::$out"
+            bun build --compile --minify --target="$t" \
+              --define "__OVERSTORY_VERSION__=\"${{ steps.v.outputs.version }}\"" \
+              ./src/cli/index.ts --outfile "dist-bin/$out"
+            echo "::endgroup::"
+          done
+
+      # A downloaded binary is worthless if it does not run. Prove the Linux one does
+      # before publishing any of them.
+      - name: smoke test the linux binary
+        run: |
+          set -euo pipefail
+          chmod +x dist-bin/overstory-linux-x64
+          got="$(./dist-bin/overstory-linux-x64 --version)"
+          test "$got" = "${{ steps.v.outputs.version }}" || { echo "version mismatch: $got"; exit 1; }
+          mkdir -p /tmp/smoke/src && cd /tmp/smoke
+          printf '/** Adds two numbers. */\nexport const add = (a, b) => a + b;\n' > src/math.js
+          printf '# Demo\n' > README.md
+          "$GITHUB_WORKSPACE/dist-bin/overstory-linux-x64" build . --provider none
+          "$GITHUB_WORKSPACE/dist-bin/overstory-linux-x64" verify .
+
+      - name: checksums
+        run: cd dist-bin && sha256sum overstory-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: publish to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-bin/overstory-*
+            dist-bin/SHA256SUMS.txt
+          body: |
+            Standalone binaries — no Node required. Download one, mark it executable, run it.
+
+            Verify your download against `SHA256SUMS.txt`.
+
+            Also available as `npx @northtek/overstory` or `npm i -g @northtek/overstory`
+            if you already have Node 20+.
+
+            See CHANGELOG.md for what changed.
+          generate_release_notes: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: overstory-binaries
+          path: dist-bin/
+          retention-days: 14
