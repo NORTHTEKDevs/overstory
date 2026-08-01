@@ -24,6 +24,12 @@ jobs:
         id: v
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
+      # A fresh runner has no node_modules, and `bun build --compile` resolves imports from
+      # disk — without this it fails on zod and the MCP SDK. Easy to miss locally, where the
+      # directory is always already populated.
+      - name: install dependencies
+        run: npm install --no-audit --no-fund
+
       # bun cross-compiles every target from one runner, so the matrix is a loop rather
       # than four jobs. The version is injected at bundle time because a compiled binary
       # has no package.json to read.
