@@ -1,6 +1,6 @@
 {
   "name": "@northtek/overstory",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Turn any repo or docs folder into a living knowledge tree where every claim carries a verifiable receipt. Local-first: your code never leaves your machine.",
   "license": "Apache-2.0",
   "type": "module",

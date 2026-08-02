@@ -6,6 +6,30 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-02
+
+Measured the detector against twelve languages and found it only worked in seven.
+
+### Added
+
+- **Go, Kotlin, Swift, C and Python docstrings are now detected.** `func`, `fun`, `suspend`,
+  `trait` and friends were missing from the declaration set, C-family declarations announce
+  themselves with a return type rather than a keyword, and Python puts its description *inside*
+  the body — so scanning upward found nothing and the whole language read as undocumented.
+  `followingDoc` handles the docstring case.
+- Coverage is now 12/12 on the probe corpus, up from 7/12.
+
+### Fixed
+
+- **C-family declarations reported the return type as the symbol name.** `public int add(...)`
+  was named `int`. The name is the identifier immediately before the parameter list, which also
+  handles `unsigned long count(void)` where several tokens of type precede it.
+- Control-flow lines (`if (x) {`, `while (…) {`, `return f(a);`) are explicitly excluded from
+  the type-first pattern, which otherwise has the same shape as a declaration.
+
+Precision held while coverage grew: the sweep across this repository's own history still
+reports two findings, both genuine, and claim counts rose 6% rather than exploding.
+
 ## [0.6.1] - 2026-08-02
 
 ### Fixed
@@ -243,7 +267,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.1...v0.5.0

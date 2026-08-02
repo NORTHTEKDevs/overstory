@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { DECL_RE, precedingDoc, signatureOf } from '../build/docblock.js';
+import { DECL_RE, followingDoc, precedingDoc, signatureOf } from '../build/docblock.js';
 
 const execFileP = promisify(execFile);
 
@@ -110,7 +110,7 @@ export const indexSymbols = (content: string): Map<string, PriorSymbol> => {
     const symbol = signatureOf(lines[i]);
     if (!symbol) continue;
     const name = symbol.replace(/\(.*$/u, ''); // key on the name; params are what may change
-    const doc = precedingDoc(lines, i);
+    const doc = precedingDoc(lines, i) ?? followingDoc(lines, i);
     if (!out.has(name)) out.set(name, { decl: lines[i], comment: doc ? doc.text : null });
   }
   return out;
@@ -134,14 +134,18 @@ export const driftInFile = (
 
   for (let i = 0; i < lines.length; i++) {
     if (!DECL_RE.test(lines[i])) continue;
-    const doc = precedingDoc(lines, i);
-    if (!doc) continue;
     const symbol = signatureOf(lines[i]);
     if (!symbol) continue;
 
+    // A description may sit above the declaration or, in Python and friends, inside it.
+    const above = precedingDoc(lines, i);
+    const below = above ? null : followingDoc(lines, i);
+    const doc = above ?? below;
+    if (!doc) continue;
+
     const declLine = i + 1;
     const commentStart = doc.startIndex + 1;
-    const commentEnd = i; // the line above the declaration
+    const commentEnd = above ? i : (below as { endIndex: number }).endIndex + 1;
 
     // How far below the declaration counts as "its code". Signature-only by default.
     let codeEnd = declLine;

@@ -10,10 +10,29 @@
  * wrongly attached one would be a false claim, so every rule here errs toward not matching.
  */
 
-/** Lines that introduce a named symbol. Shared by the summarizer and by drift detection so
- * the two can never disagree about what counts as a declaration. */
-export const DECL_RE =
-  /^(export\s|function\s|class\s|def\s|async def\s|fn\s|pub\s|impl\s|interface\s|type\s|const\s|let\s|var\s|struct\s|enum\s|mod\s|module\s|public\s|private\s)/u;
+/** Lines that introduce a named symbol, by keyword. Shared by the summarizer and by drift
+ * detection so the two can never disagree about what counts as a declaration. */
+const KEYWORD_DECL_RE =
+  /^(export\s|function\s|class\s|def\s|async def\s|fn\s|func\s|fun\s|pub\s|impl\s|trait\s|interface\s|type\s|const\s|let\s|var\s|struct\s|enum\s|mod\s|module\s|public\s|private\s|protected\s|internal\s|static\s|abstract\s|override\s|final\s|open\s|suspend\s|sub\s|proc\s)/u;
+
+/** C-family declarations announce themselves with a return type rather than a keyword:
+ * `int add(int a, int b) {`. Matching that needs care, because `if (x) {` and `foo(bar);`
+ * have the same shape. Requiring two identifiers before the parameter list, and rejecting the
+ * control-flow words, keeps calls and conditionals out. */
+const CONTROL_WORDS = /^(if|for|while|switch|catch|return|else|do|with|match|when|using|throw)\b/u;
+const CSTYLE_DECL_RE = /^[A-Za-z_][\w:<>,.\s*&[\]]*?\s[*&]?[A-Za-z_]\w*\s*\([^)]*\)\s*(?:const\s*)?[{;]?\s*$/u;
+
+/** Does this line introduce a named symbol? */
+export const DECL_RE = {
+  test(line: string): boolean {
+    const trimmed = line.trimStart();
+    if (CONTROL_WORDS.test(trimmed)) return false;
+    if (KEYWORD_DECL_RE.test(trimmed)) return true;
+    // Only consider the type-first form at low indentation: deeply nested lines that look
+    // like this are far more often calls than declarations.
+    return line.length - trimmed.length <= 4 && CSTYLE_DECL_RE.test(trimmed);
+  },
+};
 
 /** Lines that may sit between a doc comment and the thing it documents without breaking the
  * association: decorators, attributes, annotations, and export modifiers. */
@@ -80,6 +99,47 @@ export const precedingDoc = (lines: string[], declIndex: number): { startIndex: 
   return { startIndex, text: prose };
 };
 
+/**
+ * Find a docstring on the line(s) *after* a declaration.
+ *
+ * Python and friends put the description inside the body rather than above the `def`, so
+ * scanning upward finds nothing and the whole language reads as undocumented. Returns the
+ * block's offsets within `lines`, inclusive.
+ */
+export const followingDoc = (
+  lines: string[],
+  declIndex: number,
+): { startIndex: number; endIndex: number; text: string } | null => {
+  let i = declIndex + 1;
+  // A signature may wrap across lines before the body starts.
+  while (i < lines.length && lines[i].trim().length === 0) i++;
+  if (i >= lines.length) return null;
+
+  const opener = /^\s*([ru]?[bf]?)("""|''')/iu.exec(lines[i]);
+  if (!opener) return null;
+  const quote = opener[2];
+  const first = lines[i].slice(lines[i].indexOf(quote) + quote.length);
+
+  // Single-line docstring: opener and closer on the same line.
+  const sameLine = first.indexOf(quote);
+  if (sameLine >= 0) {
+    const text = first.slice(0, sameLine).trim();
+    return text.length < 12 ? null : { startIndex: i, endIndex: i, text };
+  }
+
+  const collected = [first.trim()];
+  let j = i + 1;
+  const ceiling = Math.min(lines.length, i + 60);
+  while (j < ceiling && !lines[j].includes(quote)) {
+    collected.push(lines[j].trim());
+    j++;
+  }
+  if (j >= ceiling) return null; // unterminated: refuse rather than swallow the file
+  collected.push(lines[j].slice(0, lines[j].indexOf(quote)).trim());
+  const text = collected.filter((l) => l.length > 0).join(' ').replace(/\s+/gu, ' ').trim();
+  return text.length < 12 ? null : { startIndex: i, endIndex: j, text };
+};
+
 /** First sentence of a doc block, trimmed to something that reads as a claim. */
 export const firstSentence = (prose: string, max = 180): string => {
   const match = /^(.+?[.!?])(\s|$)/u.exec(prose);
@@ -94,7 +154,27 @@ const DECL_KEYWORDS =
 /** A readable signature for a declaration line: the symbol, plus parameter names when it is
  * callable. Types are dropped deliberately — the receipt carries the exact source. */
 export const signatureOf = (line: string): string | null => {
-  const body = line.replace(DECL_KEYWORDS, '').trim();
+  let body = line.replace(DECL_KEYWORDS, '').trim();
+
+  // In the C family the return type comes first: `int add(int a, int b)` must name `add`,
+  // not `int`. Two bare identifiers in a row means the first one is a type — drop it, and
+  // keep dropping while that pattern holds (`unsigned long count(...)`). Anything followed
+  // by `(`, `=`, `:` or `<` is already the name.
+  // In the C family the return type comes first and there may be several tokens of it:
+  // `unsigned long count(void)`. The name is simply the identifier sitting immediately
+  // before the parameter list, so find that rather than trying to peel types one at a time.
+  // Forms like `add = (a, b) =>` have no identifier touching the paren and fall through to
+  // the first-identifier rule below, which is correct for them.
+  const parenAt = body.indexOf('(');
+  if (parenAt > 0) {
+    const head = body.slice(0, parenAt);
+    const beforeParen = /([A-Za-z_$][\w$]*)\s*$/u.exec(head);
+    // Only rewrite when something precedes the name, i.e. a return type or modifiers.
+    if (beforeParen && /^[A-Za-z_$][\w$]*[\s*&]/u.test(body)) {
+      body = body.slice(head.lastIndexOf(beforeParen[1]));
+    }
+  }
+
   const nameMatch = /^([A-Za-z_$][\w$]*)/u.exec(body);
   if (!nameMatch) return null;
   const name = nameMatch[1];

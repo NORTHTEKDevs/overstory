@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstSentence, precedingDoc, signatureOf } from '../src/build/docblock.js';
+import { DECL_RE, firstSentence, followingDoc, precedingDoc, signatureOf } from '../src/build/docblock.js';
 import { extractiveClaims } from '../src/build/summarize.js';
 import { makeSpan, verifyTree } from '../src/core/gate.js';
 import { sha256, normalizeText, splitLines } from '../src/core/hash.js';
@@ -140,5 +140,61 @@ describe('extractive claims from doc comments', () => {
     const claims = extractiveClaims('b.ts', span, corpus);
     expect(claims.length).toBeLessThanOrEqual(8);
     expect(claims.some((c) => c.text.includes('theImportantOne'))).toBe(true);
+  });
+});
+
+describe('language coverage', () => {
+  // Each case is a documented symbol in a language OVERSTORY claims to support. A regression
+  // here means an entire ecosystem silently reads as undocumented.
+  const cases: Array<[string, string, string]> = [
+    ['go', 'func Add(a int, b int) int {', 'Add(a int, b int)'],
+    ['kotlin', 'fun add(a: Int, b: Int): Int {', 'add(a, b)'],
+    ['swift', 'func add(a: Int, b: Int) -> Int {', 'add(a, b)'],
+    ['rust', 'pub fn add(a: i32, b: i32) -> i32 {', 'add(a, b)'],
+    ['python', 'def add(a, b):', 'add(a, b)'],
+    ['ruby', 'def add(a, b)', 'add(a, b)'],
+    ['typescript', 'export const add = (a: number, b: number) => a + b;', 'add(a, b)'],
+  ];
+
+  it.each(cases)('recognises a %s declaration', (_lang, line, _sig) => {
+    expect(DECL_RE.test(line)).toBe(true);
+  });
+
+  it('names the function, not its return type, in C-family declarations', () => {
+    // The bug this guards: `public int add(...)` reported the symbol as "int".
+    expect(signatureOf('public int add(int a, int b) {')).toBe('add(int a, int b)');
+    expect(signatureOf('int add(int a, int b) {')).toBe('add(int a, int b)');
+    expect(signatureOf('public static void main(String[] args) {')).toBe('main(String[] args)');
+    expect(signatureOf('unsigned long count(void) {')).toBe('count(void)');
+  });
+
+  it('does not mistake control flow or calls for declarations', () => {
+    for (const line of ['if (x) {', 'while (ready) {', 'for (const a of b) {', 'switch (v) {', 'return add(a, b);', '  doThing(arg);']) {
+      expect(DECL_RE.test(line)).toBe(false);
+    }
+  });
+});
+
+describe('followingDoc', () => {
+  it('reads a single-line Python docstring', () => {
+    const lines = ['def add(a, b):', '    """Adds two numbers and returns the sum."""', '    return a + b'];
+    expect(followingDoc(lines, 0)?.text).toBe('Adds two numbers and returns the sum.');
+  });
+
+  it('reads a multi-line docstring and reports where it ends', () => {
+    const lines = ['def add(a, b):', '    """', '    Adds two numbers', '    and returns the sum.', '    """', '    return a + b'];
+    const doc = followingDoc(lines, 0);
+    expect(doc?.text).toBe('Adds two numbers and returns the sum.');
+    expect(doc?.startIndex).toBe(1);
+    expect(doc?.endIndex).toBe(4);
+  });
+
+  it('refuses an unterminated docstring rather than swallowing the file', () => {
+    const lines = ['def add(a, b):', '    """never closed', ...Array.from({ length: 80 }, () => '    x')];
+    expect(followingDoc(lines, 0)).toBeNull();
+  });
+
+  it('returns nothing when the body is code, not a description', () => {
+    expect(followingDoc(['def add(a, b):', '    return a + b'], 0)).toBeNull();
   });
 });
