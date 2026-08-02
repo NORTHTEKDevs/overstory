@@ -22,6 +22,9 @@ export interface DriftFinding {
   /** Line of the declaration whose code moved. */
   line: number;
   symbol: string;
+  /** The declaration as it read before this change, when it could be recovered. Turns
+   * "something moved" into "this is what moved", which is what a reviewer needs. */
+  was?: string;
   /** The comment that did not move with it. */
   comment: string;
   commentStartLine: number;
@@ -80,6 +83,39 @@ export const parseDiff = (raw: string): FileDiff[] => {
 const intersects = (ranges: ChangedRange[], start: number, end: number): boolean =>
   ranges.some((r) => r.start <= end && r.end >= start);
 
+/** Compare code for meaning, not for bytes. Reformatting is not drift: if a formatter
+ * reflows a signature, the diff marks the line as changed but nothing about the contract
+ * moved, and flagging it would light up every declaration in a Prettier commit.
+ *
+ * Whitespace is removed entirely rather than collapsed, because collapsing still leaves
+ * `(): string` and `() : string` different while meaning the same thing. Identifiers cannot
+ * contain spaces, so for an equality test this is safe. */
+const normalizeCode = (text: string): string => text.replace(/\s+/gu, '');
+
+/** Prose needs the softer rule: words matter, line wrapping does not. */
+const normalizeProse = (text: string): string => text.replace(/\s+/gu, ' ').trim();
+
+/** Index the previous version of a file by symbol, so a flagged declaration can be compared
+ * against what it actually replaced rather than against a line number. Keyed by symbol
+ * because line numbers shift for reasons that have nothing to do with the symbol. */
+interface PriorSymbol {
+  decl: string;
+  comment: string | null;
+}
+export const indexSymbols = (content: string): Map<string, PriorSymbol> => {
+  const lines = content.split('\n').map((l) => l.replace(/\r$/u, ''));
+  const out = new Map<string, PriorSymbol>();
+  for (let i = 0; i < lines.length; i++) {
+    if (!DECL_RE.test(lines[i])) continue;
+    const symbol = signatureOf(lines[i]);
+    if (!symbol) continue;
+    const name = symbol.replace(/\(.*$/u, ''); // key on the name; params are what may change
+    const doc = precedingDoc(lines, i);
+    if (!out.has(name)) out.set(name, { decl: lines[i], comment: doc ? doc.text : null });
+  }
+  return out;
+};
+
 /**
  * Find documented symbols whose code changed while their comment did not.
  *
@@ -90,9 +126,10 @@ export const driftInFile = (
   file: string,
   content: string,
   ranges: ChangedRange[],
-  opts: { includeBody?: boolean } = {},
+  opts: { includeBody?: boolean; previous?: string } = {},
 ): DriftFinding[] => {
   const lines = content.split('\n').map((l) => l.replace(/\r$/u, ''));
+  const prior = opts.previous === undefined ? null : indexSymbols(opts.previous);
   const findings: DriftFinding[] = [];
 
   for (let i = 0; i < lines.length; i++) {
@@ -114,13 +151,32 @@ export const driftInFile = (
       codeEnd = j; // up to the next declaration
     }
 
-    const codeChanged = intersects(ranges, declLine, codeEnd);
-    const commentChanged = intersects(ranges, commentStart, commentEnd);
+    // The diff says where to look. It does not say whether anything meaningful happened.
+    if (!intersects(ranges, declLine, codeEnd) && !intersects(ranges, commentStart, commentEnd)) continue;
+
+    let codeChanged = intersects(ranges, declLine, codeEnd);
+    let commentChanged = intersects(ranges, commentStart, commentEnd);
+    let was: string | undefined;
+
+    if (prior) {
+      const previous = prior.get(symbol.replace(/\(.*$/u, ''));
+      // A symbol with no previous version is new; its comment is new too, so nothing drifted.
+      if (!previous) continue;
+      // Compare against what this actually replaced. Whitespace-only edits are not drift,
+      // and a reflowed comment is not an updated comment.
+      codeChanged = normalizeCode(previous.decl) !== normalizeCode(lines[i]);
+      commentChanged = normalizeProse(previous.comment ?? '') !== normalizeProse(doc.text);
+      if (codeChanged) was = previous.decl.trim();
+      // With the body in scope, a body edit still counts even if the signature held.
+      if (opts.includeBody && !codeChanged) codeChanged = intersects(ranges, declLine + 1, codeEnd);
+    }
+
     if (codeChanged && !commentChanged) {
       findings.push({
         file,
         line: declLine,
         symbol,
+        was,
         comment: doc.text,
         commentStartLine: commentStart,
         commentEndLine: commentEnd,
@@ -178,7 +234,15 @@ export const detectDrift = async (root: string, opts: DriftOptions = {}): Promis
     } catch {
       continue; // file is gone, binary, or unreadable at that ref
     }
-    findings.push(...driftInFile(d.file, content, d.ranges, { includeBody: opts.includeBody }));
+    // The previous version turns "this line was touched" into "this declaration actually
+    // changed". Without it a formatter run reports drift on every symbol it reflows.
+    let previous: string | undefined;
+    try {
+      previous = await runGit(['show', `${opts.base ?? 'HEAD'}:${d.file}`], root);
+    } catch {
+      previous = undefined; // new file, or not present on the base side
+    }
+    findings.push(...driftInFile(d.file, content, d.ranges, { includeBody: opts.includeBody, previous }));
   }
 
   return { available: true, comparison, filesChanged: diffs.length, findings };

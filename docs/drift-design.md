@@ -35,6 +35,30 @@ for. Teams opt into gating once they trust the signal.
 
 **One comment, updated in place.** Re-posting per push trains people to mute the bot.
 
+## The diff says where to look, not whether anything happened
+
+A hunk header only reports that a line was touched. Acting on that alone means a formatter run
+flags every signature it reflows, and a bot that noisy is muted within a day — which costs far
+more than the misses it was trying to prevent.
+
+So each candidate is compared against the version it actually replaced, looked up by symbol
+name rather than line number (line numbers shift for reasons that have nothing to do with the
+symbol). Whitespace is stripped entirely before comparing code, because collapsing runs still
+leaves `(): string` and `() : string` unequal while they mean the same thing. Comment prose
+gets the softer rule — words matter, wrapping does not — so a reflowed comment counts as
+unchanged and drift underneath it is still reported.
+
+This also lets a finding say what actually moved:
+
+```
+was:      const isExcludedDir = (name: string, depth: number): boolean =>
+now:      isExcludedDir(segment, depth)
+comment:  "Is this path segment excluded, given how deep it sits?"
+```
+
+Measured against this repository's own 54 commits, the comparison removed one false positive
+and left two findings, both genuine.
+
 ## Behaviour
 
 - New files never flag: their comments are new too, so nothing drifted.

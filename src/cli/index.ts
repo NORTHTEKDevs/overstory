@@ -144,8 +144,9 @@ const main = async (): Promise<number> => {
     process.stdout.write(`\n  ${n} changed symbol${n === 1 ? '' : 's'} whose docs did not move\n\n`);
     for (const f of report.findings) {
       process.stdout.write(`  ${f.file}:${f.line}\n`);
-      process.stdout.write(`    changed:  ${f.symbol}\n`);
-      process.stdout.write(`    comment:  "${f.comment.length > 96 ? `${f.comment.slice(0, 95)}…` : f.comment}"\n`);
+      if (f.was) process.stdout.write(`    was:      ${f.was.length > 88 ? `${f.was.slice(0, 87)}…` : f.was}\n`);
+      process.stdout.write(`    now:      ${f.symbol}\n`);
+      process.stdout.write(`    comment:  "${f.comment.length > 88 ? `${f.comment.slice(0, 87)}…` : f.comment}"\n`);
       process.stdout.write(`              lines ${f.commentStartLine}-${f.commentEndLine}, unchanged in this diff\n\n`);
     }
     process.stdout.write(`  Either the comment still holds and you can ignore this, or it does not and nobody would have noticed.\n\n`);

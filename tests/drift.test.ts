@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectDrift, driftInFile, parseDiff } from '../src/drift/detect.js';
+import { detectDrift, driftInFile, indexSymbols, parseDiff } from '../src/drift/detect.js';
 
 describe('parseDiff', () => {
   it('reads new-side line ranges from hunk headers', () => {
@@ -111,21 +111,26 @@ describe('driftInFile', () => {
 describe('detectDrift', () => {
   const diff = ['+++ b/m.ts', '@@ -2 +2 @@'].join('\n');
 
-  it('reads the file at the named head rather than from disk', async () => {
+  it('reads both sides from the refs under comparison, not from disk', async () => {
+    const OLD = ['/** Adds two numbers and returns the sum. */', 'export const add = (a, b) => a + b;', ''].join('\n');
+    const NEW = ['/** Adds two numbers and returns the sum. */', 'export const add = (x, y) => x + y;', ''].join('\n');
     const calls: string[][] = [];
     const report = await detectDrift('/repo', {
       base: 'main',
       head: 'abc123',
       runGit: async (args) => {
         calls.push(args);
-        return args[0] === 'diff' ? diff : FILE;
+        if (args[0] === 'diff') return diff;
+        return args[1] === 'abc123:m.ts' ? NEW : OLD;
       },
     });
     expect(report.available).toBe(true);
     expect(report.findings).toHaveLength(1);
-    // Content must come from the ref under review, not the working tree, or CI and local
+    expect(report.findings[0].was).toBe('export const add = (a, b) => a + b;');
+    // Content must come from the refs under review, not the working tree, or CI and local
     // runs disagree whenever the tree is dirty.
     expect(calls.some((c) => c[0] === 'show' && c[1] === 'abc123:m.ts')).toBe(true);
+    expect(calls.some((c) => c[0] === 'show' && c[1] === 'main:m.ts')).toBe(true);
   });
 
   it('reports unavailable instead of throwing outside a repository', async () => {
@@ -144,5 +149,65 @@ describe('detectDrift', () => {
     });
     expect(report.filesChanged).toBe(0);
     expect(report.findings).toEqual([]);
+  });
+});
+
+describe('semantic comparison against the previous version', () => {
+  const before = ['/** Adds two numbers and returns the sum. */', 'export const add = (a, b) => a + b;', ''].join('\n');
+
+  it('ignores a whitespace-only reformat of the declaration', () => {
+    // The failure this prevents: a Prettier run marks every signature as changed, the bot
+    // comments on all of them, and the team mutes it that afternoon.
+    const reformatted = ['/** Adds two numbers and returns the sum. */', 'export const add = (a,b) => a + b;', ''].join('\n');
+    expect(driftInFile('m.ts', reformatted, [{ start: 2, end: 2 }], { previous: before })).toEqual([]);
+  });
+
+  it('still flags a genuine signature change, and reports what it was', () => {
+    const renamed = ['/** Adds two numbers and returns the sum. */', 'export const add = (x, y) => x + y;', ''].join('\n');
+    const found = driftInFile('m.ts', renamed, [{ start: 2, end: 2 }], { previous: before });
+    expect(found).toHaveLength(1);
+    expect(found[0].symbol).toBe('add(x, y)');
+    expect(found[0].was).toBe('export const add = (a, b) => a + b;');
+  });
+
+  it('treats a reflowed comment as unchanged, so drift underneath it still reports', () => {
+    // Rewrapping prose is not updating it. Counting a reflow as "the comment moved" would
+    // silently swallow real drift.
+    const reflowed = [
+      '/**',
+      ' * Adds two numbers',
+      ' * and returns the sum.',
+      ' */',
+      'export const add = (x, y) => x + y;',
+      '',
+    ].join('\n');
+    const found = driftInFile('m.ts', reflowed, [{ start: 1, end: 5 }], { previous: before });
+    expect(found).toHaveLength(1);
+    expect(found[0].symbol).toBe('add(x, y)');
+  });
+
+  it('goes quiet when the comment was genuinely rewritten', () => {
+    const updated = ['/** Subtracts the second number from the first. */', 'export const add = (x, y) => x - y;', ''].join('\n');
+    expect(driftInFile('m.ts', updated, [{ start: 1, end: 2 }], { previous: before })).toEqual([]);
+  });
+
+  it('skips symbols that did not exist before', () => {
+    const added = [
+      '/** Adds two numbers and returns the sum. */',
+      'export const add = (a, b) => a + b;',
+      '/** Multiplies two numbers together. */',
+      'export const times = (a, b) => a * b;',
+      '',
+    ].join('\n');
+    const found = driftInFile('m.ts', added, [{ start: 3, end: 4 }], { previous: before });
+    expect(found).toEqual([]);
+  });
+});
+
+describe('indexSymbols', () => {
+  it('keys by symbol name so a parameter change is still matchable', () => {
+    const idx = indexSymbols(['/** Does a thing here. */', 'export const go = (a) => a;', ''].join('\n'));
+    expect(idx.get('go')?.comment).toBe('Does a thing here.');
+    expect(idx.get('go')?.decl).toBe('export const go = (a) => a;');
   });
 });

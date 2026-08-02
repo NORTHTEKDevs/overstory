@@ -6,6 +6,25 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-02
+
+### Fixed
+
+- **A whitespace-only reformat no longer reports drift.** The detector acted on the diff alone,
+  so reflowing a signature marked it changed and a formatter run would have flagged every
+  declaration it touched — the exact noise that gets a review bot muted. Each candidate is now
+  compared against the version it replaced, matched by symbol name rather than line number.
+- **A reflowed comment no longer counts as an updated one**, so drift underneath it still
+  reports. Rewrapping prose is not revising it.
+
+### Added
+
+- Findings carry `was`: the declaration as it read before the change. The output moves from
+  "something moved here" to "`name` became `segment`, and your comment still says segment".
+
+Swept across this repository's own 54 commits: one false positive removed, two findings left,
+both genuine.
+
 ## [0.6.0] - 2026-08-01
 
 Documentation drift, with nothing to install and nothing to build.
@@ -224,7 +243,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.0...v0.4.1

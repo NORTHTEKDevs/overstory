@@ -184,7 +184,8 @@ $ npx @northtek/overstory drift --base main
   1 changed symbol whose docs did not move
 
   src/core/corpus.ts:26
-    changed:  isExcludedDir(segment, depth)
+    was:      const isExcludedDir = (name: string, depth: number): boolean =>
+    now:      isExcludedDir(segment, depth)
     comment:  "Is this path segment excluded, given how deep it sits?"
               lines 25-25, unchanged in this diff
 
@@ -202,6 +203,10 @@ requests, three lines of YAML:
 It leaves one comment and updates it in place. **It does not fail your build by default** —
 a tool that starts breaking CI the day you install it gets removed before anyone sees the
 point. Set `fail-on-drift: true` once your team trusts the signal.
+
+It compares each candidate against the version it replaced rather than trusting the diff, so a
+formatter reflowing your signatures reports nothing — the noise that would otherwise get the
+bot muted in a week.
 
 By default it flags changes to the *declaration line* — the signature the comment describes.
 That misses a body change like `return a + b` becoming `return a - b` under an unchanged
