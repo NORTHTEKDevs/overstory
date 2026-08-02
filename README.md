@@ -173,6 +173,42 @@ For a repository, committing `.overstory/tree.json` and adding `overstory verify
 the durable version: reviewers see the claims in the diff, and the build fails when merged
 code stales them.
 
+## Catch it in review, with nothing installed
+
+`overstory drift` needs **no tree, no build, and no configuration**. It reads a diff and tells
+you which code you changed under doc comments you did not:
+
+```console
+$ npx @northtek/overstory drift --base main
+
+  1 changed symbol whose docs did not move
+
+  src/core/corpus.ts:26
+    changed:  isExcludedDir(segment, depth)
+    comment:  "Is this path segment excluded, given how deep it sits?"
+              lines 25-25, unchanged in this diff
+
+  Either the comment still holds and you can ignore this, or it does not and
+  nobody would have noticed.
+```
+
+Exit code 1 when something drifted, so it works unchanged as a pre-commit hook. On pull
+requests, three lines of YAML:
+
+```yaml
+- uses: NORTHTEKDevs/overstory@v1
+```
+
+It leaves one comment and updates it in place. **It does not fail your build by default** —
+a tool that starts breaking CI the day you install it gets removed before anyone sees the
+point. Set `fail-on-drift: true` once your team trusts the signal.
+
+By default it flags changes to the *declaration line* — the signature the comment describes.
+That misses a body change like `return a + b` becoming `return a - b` under an unchanged
+comment; `--include-body` catches those at the cost of firing on ordinary refactors. The
+narrow default is deliberate, and the trade is written down in
+[docs/drift-design.md](docs/drift-design.md).
+
 ## Where to look first
 
 `overstory insight` crosses two things nothing else has together: git knows which files are

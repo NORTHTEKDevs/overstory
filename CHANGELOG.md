@@ -6,6 +6,30 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-01
+
+Documentation drift, with nothing to install and nothing to build.
+
+### Added
+
+- **`overstory drift`** reads a git diff and reports code you changed under doc comments you
+  did not. It needs **no knowledge tree, no build and no configuration** — which removes the
+  thing that made every other feature hard to adopt. Exit 1 on drift, so it doubles as a
+  pre-commit hook. `--base`, `--head`, `--json`, `--include-body`.
+- **A GitHub Action** (`uses: NORTHTEKDevs/overstory@v1`). It maintains one pull request
+  comment and updates it in place rather than posting per push.
+
+### Decisions
+
+- **The Action does not fail builds by default.** `fail-on-drift` is false until a team turns
+  it on. A tool that starts breaking CI the day it is installed gets removed before anyone
+  sees what it is for.
+- **Drift means the declaration line moved**, not the body. A body change can absolutely
+  invalidate a comment and this default misses that; flagging every body edit would fire on
+  ordinary refactors, and a review bot people mute is worth nothing. `--include-body` opts in.
+- `DECL_RE` now lives in `docblock.ts` and is shared with the summarizer, so the two cannot
+  disagree about what a declaration is.
+
 ## [0.5.0] - 2026-07-31
 
 Git history, fused with the verification state — the one combination that needs both halves.
@@ -200,7 +224,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.3.0...v0.4.0

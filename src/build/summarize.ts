@@ -3,10 +3,8 @@ import { chunkFile } from '../core/chunk.js';
 import { makeSpan } from '../core/gate.js';
 import type { Claim, CorpusSnapshot, SpanRef } from '../core/types.js';
 import type { ChatProvider } from '../llm/provider.js';
-import { firstSentence, isExported, precedingDoc, signatureOf } from './docblock.js';
+import { DECL_RE, firstSentence, isExported, precedingDoc, signatureOf } from './docblock.js';
 
-const DECL_RE =
-  /^(export\s|function\s|class\s|def\s|async def\s|fn\s|pub\s|impl\s|interface\s|type\s|const\s|let\s|var\s|struct\s|enum\s|mod\s|module\s|public\s|private\s)/u;
 const HEADING_RE = /^(#{1,3}) (.+)$/u;
 
 const claimDraftSchema = z.object({

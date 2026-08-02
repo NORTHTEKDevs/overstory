@@ -1,0 +1,101 @@
+name: 'OVERSTORY doc drift'
+description: 'Comment on a pull request when it changes code under doc comments it did not update.'
+branding:
+  icon: 'git-commit'
+  color: 'green'
+
+inputs:
+  base:
+    description: 'Ref to compare against. Defaults to the pull request base.'
+    required: false
+    default: ''
+  fail-on-drift:
+    description: >
+      Fail the check when drift is found. Defaults to false on purpose: a tool that starts
+      breaking CI the day it is installed gets removed before anyone sees what it is for.
+      Turn this on once the team trusts the signal.
+    required: false
+    default: 'false'
+  include-body:
+    description: 'Also flag changes below the declaration line. Noisier; off by default.'
+    required: false
+    default: 'false'
+  comment:
+    description: 'Post a pull request comment with the findings.'
+    required: false
+    default: 'true'
+
+outputs:
+  drift-count:
+    description: 'Number of changed symbols whose docs did not move.'
+    value: ${{ steps.drift.outputs.count }}
+
+runs:
+  using: composite
+  steps:
+    - name: run overstory drift
+      id: drift
+      shell: bash
+      env:
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_INCLUDE_BODY: ${{ inputs.include-body }}
+        PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: |
+        set -uo pipefail
+        BASE="${INPUT_BASE:-$PR_BASE_SHA}"
+        if [ -z "$BASE" ]; then
+          echo "No base ref available; supply the 'base' input outside a pull request." >&2
+          echo "count=0" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        # The checkout is usually shallow, so the base commit may be absent locally.
+        git fetch --no-tags --depth=50 origin "$BASE" 2>/dev/null || true
+        EXTRA=""
+        [ "$INPUT_INCLUDE_BODY" = "true" ] && EXTRA="--include-body"
+        npx --yes @northtek/overstory drift . --base "$BASE" $EXTRA --json > drift.json || true
+        COUNT=$(node -p "try{JSON.parse(require('fs').readFileSync('drift.json','utf8')).findings.length}catch(e){0}")
+        echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+        echo "Found $COUNT changed symbol(s) whose docs did not move."
+
+    - name: comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          let report;
+          try { report = JSON.parse(fs.readFileSync('drift.json', 'utf8')); } catch { return; }
+          const findings = report.findings || [];
+          const MARKER = '<!-- overstory-drift -->';
+
+          const body = findings.length === 0
+            ? `${MARKER}\n**OVERSTORY** — no documentation drift in this change.`
+            : [
+                MARKER,
+                `**OVERSTORY** — ${findings.length} changed symbol${findings.length === 1 ? '' : 's'} whose doc comment${findings.length === 1 ? '' : 's'} did not move:`,
+                '',
+                ...findings.slice(0, 20).map((f) =>
+                  `- \`${f.file}:${f.line}\` — **${f.symbol}**\n  > ${f.comment}`),
+                findings.length > 20 ? `\n…and ${findings.length - 20} more.` : '',
+                '',
+                'Either the comment still holds and you can ignore this, or it does not and nobody would have noticed.',
+              ].join('\n');
+
+          // Update one comment in place. Posting per push trains people to mute the bot.
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+          const existing = (await github.rest.issues.listComments({ owner, repo, issue_number }))
+            .data.find((c) => c.body && c.body.includes(MARKER));
+          if (existing) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+          } else if (findings.length > 0) {
+            // Do not open with a "nothing to see here" comment on a clean pull request.
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          }
+
+    - name: fail when asked to
+      if: ${{ inputs.fail-on-drift == 'true' && steps.drift.outputs.count != '0' }}
+      shell: bash
+      run: |
+        echo "Documentation drift found and fail-on-drift is enabled." >&2
+        exit 1

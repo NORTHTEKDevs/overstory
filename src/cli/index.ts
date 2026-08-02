@@ -18,6 +18,7 @@ import { credentialsPath, maskKey, readCredentials } from '../core/credentials.j
 import { ollamaModels } from '../llm/ollama.js';
 import { readHistory } from '../git/history.js';
 import { documentationRisk, hotspots, knowledgeConcentration } from '../git/risk.js';
+import { detectDrift } from '../drift/detect.js';
 
 const HELP = `overstory — a knowledge tree of your codebase where every claim carries a receipt.
 Local-first: nothing leaves this machine.
@@ -30,6 +31,7 @@ Usage:
   overstory fix    [path]   Paste-ready fix prompts for your agent, grounded in receipts
   overstory site   [path]   Export the shareable single-file explorer
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
+  overstory drift  [path]   Docs you did not update for code you did change (no tree needed)
   overstory insight [path]  Hotspots, ownership, coupling, and documentation risk (from git)
   overstory providers       Show available models and APIs, and where your keys are
 
@@ -41,6 +43,9 @@ Options:
   --max-files <n>           Corpus cap (default 5000)
   --out <file>              Output path for site
   --port <n>                Port for serve (default 7433)
+  --base <ref>              drift: compare against this ref (e.g. main)
+  --head <ref>              drift: compare up to this ref instead of the working tree
+  --include-body            drift: also flag changes below the declaration line
   --json                    Machine-readable output
   --version, -v             Print the installed version
   --help, -h                Show this help
@@ -48,6 +53,9 @@ Options:
 
 interface Flags {
   provider: string;
+  base?: string;
+  head?: string;
+  includeBody: boolean;
   model?: string;
   rounds: number;
   include: string[];
@@ -67,7 +75,7 @@ const numFlag = (raw: string | undefined, flag: string): number => {
 };
 
 const parseArgs = (argv: string[]): { cmd: string; positional: string[]; flags: Flags } => {
-  const flags: Flags = { provider: 'auto', rounds: 1, include: [], json: false };
+  const flags: Flags = { provider: 'auto', rounds: 1, include: [], json: false, includeBody: false };
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -79,6 +87,9 @@ const parseArgs = (argv: string[]): { cmd: string; positional: string[]; flags: 
     else if (a === '--max-files') flags.maxFiles = numFlag(argv[++i], '--max-files');
     else if (a === '--out') flags.out = argv[++i];
     else if (a === '--port') flags.port = numFlag(argv[++i], '--port');
+    else if (a === '--base') flags.base = argv[++i];
+    else if (a === '--head') flags.head = argv[++i];
+    else if (a === '--include-body') flags.includeBody = true;
     else if (a === '--help' || a === '-h') positional.push('help');
     else if (a === '--version' || a === '-v') positional.unshift('version');
     else positional.push(a);
@@ -107,6 +118,38 @@ const main = async (): Promise<number> => {
   if (cmd === 'help') {
     process.stdout.write(HELP);
     return 0;
+  }
+
+  if (cmd === 'drift') {
+    // No tree, no build, no config — the entire point. This has to work on a repo the user
+    // heard about ninety seconds ago.
+    const report = await detectDrift(root, {
+      base: flags.base,
+      head: flags.head,
+      includeBody: flags.includeBody,
+    });
+    if (!report.available) {
+      log(`Could not read a diff${report.reason ? ` (${report.reason})` : ''} — drift needs a git repository.`);
+      return 2;
+    }
+    if (flags.json) {
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      return report.findings.length > 0 ? 1 : 0;
+    }
+    if (report.findings.length === 0) {
+      log(`No documentation drift across ${report.comparison} (${report.filesChanged} file${report.filesChanged === 1 ? '' : 's'} changed).`);
+      return 0;
+    }
+    const n = report.findings.length;
+    process.stdout.write(`\n  ${n} changed symbol${n === 1 ? '' : 's'} whose docs did not move\n\n`);
+    for (const f of report.findings) {
+      process.stdout.write(`  ${f.file}:${f.line}\n`);
+      process.stdout.write(`    changed:  ${f.symbol}\n`);
+      process.stdout.write(`    comment:  "${f.comment.length > 96 ? `${f.comment.slice(0, 95)}…` : f.comment}"\n`);
+      process.stdout.write(`              lines ${f.commentStartLine}-${f.commentEndLine}, unchanged in this diff\n\n`);
+    }
+    process.stdout.write(`  Either the comment still holds and you can ignore this, or it does not and nobody would have noticed.\n\n`);
+    return 1;
   }
 
   if (cmd === 'insight') {

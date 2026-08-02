@@ -10,6 +10,11 @@
  * wrongly attached one would be a false claim, so every rule here errs toward not matching.
  */
 
+/** Lines that introduce a named symbol. Shared by the summarizer and by drift detection so
+ * the two can never disagree about what counts as a declaration. */
+export const DECL_RE =
+  /^(export\s|function\s|class\s|def\s|async def\s|fn\s|pub\s|impl\s|interface\s|type\s|const\s|let\s|var\s|struct\s|enum\s|mod\s|module\s|public\s|private\s)/u;
+
 /** Lines that may sit between a doc comment and the thing it documents without breaking the
  * association: decorators, attributes, annotations, and export modifiers. */
 const INTERVENING_RE = /^\s*(@\w|#\[|\[\w+\]|export\s+default\s*$|pub\s*$)/u;
