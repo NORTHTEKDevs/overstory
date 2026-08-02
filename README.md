@@ -110,6 +110,7 @@ Verify any download against `SHA256SUMS.txt` on the release.
 ```
 npx @northtek/overstory build     # build the tree (resumable; reuses unchanged files)
 npx @northtek/overstory serve     # open the app: ask your codebase, answers notarized
+npx @northtek/overstory drift     # docs you didn't update for code you did (no tree needed)
 npx @northtek/overstory verify    # CI-friendly: exit 1 if any receipt fails
 npx @northtek/overstory mcp       # MCP tools for Claude Code / Cursor
 npx @northtek/overstory site      # shareable single-file explorer
