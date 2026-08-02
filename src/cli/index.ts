@@ -19,6 +19,8 @@ import { ollamaModels } from '../llm/ollama.js';
 import { readHistory } from '../git/history.js';
 import { documentationRisk, hotspots, knowledgeConcentration } from '../git/risk.js';
 import { detectDrift } from '../drift/detect.js';
+import { contractMismatches } from '../drift/contract.js';
+import { readFile } from 'node:fs/promises';
 
 const HELP = `overstory — a knowledge tree of your codebase where every claim carries a receipt.
 Local-first: nothing leaves this machine.
@@ -32,6 +34,7 @@ Usage:
   overstory site   [path]   Export the shareable single-file explorer
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
   overstory drift  [path]   Docs you did not update for code you did change (no tree needed)
+  overstory contract [path] Documented parameters that disagree with the signature (provable)
   overstory insight [path]  Hotspots, ownership, coupling, and documentation risk (from git)
   overstory providers       Show available models and APIs, and where your keys are
 
@@ -151,6 +154,58 @@ const main = async (): Promise<number> => {
     }
     process.stdout.write(`  Either the comment still holds and you can ignore this, or it does not and nobody would have noticed.\n\n`);
     return 1;
+  }
+
+  if (cmd === 'contract') {
+    // Provable drift: a documented parameter list that disagrees with the signature. No diff,
+    // no history, no model — this works on a single file the first time you run it.
+    const corpus = await loadCorpus(root, { maxFiles: flags.maxFiles });
+    const findings = [];
+    for (const file of corpus.files.keys()) {
+      let content: string;
+      try {
+        content = await readFile(join(root, file), 'utf8');
+      } catch {
+        continue;
+      }
+      findings.push(...contractMismatches(file, content));
+    }
+    const broken = findings.filter((f) => f.documentedButMissing.length > 0);
+    if (flags.json) {
+      process.stdout.write(`${JSON.stringify({ scanned: corpus.files.size, findings }, null, 2)}
+`);
+      return broken.length > 0 ? 1 : 0;
+    }
+    if (findings.length === 0) {
+      log(`Every documented parameter list matches its signature (${corpus.files.size} files).`);
+      return 0;
+    }
+    if (broken.length > 0) {
+      process.stdout.write(`
+  ${broken.length} documented parameter${broken.length === 1 ? '' : 's'} that no longer exist
+
+`);
+      for (const f of broken) {
+        process.stdout.write(`  ${f.file}:${f.line}  ${f.symbol}
+`);
+        process.stdout.write(`    documents: ${f.documentedButMissing.join(', ')}  — not in the signature
+
+`);
+      }
+    }
+    const missing = findings.filter((f) => f.undocumented.length > 0 && f.documentedButMissing.length === 0);
+    if (missing.length > 0) {
+      process.stdout.write(`  ${missing.length} function${missing.length === 1 ? '' : 's'} with undocumented parameters
+
+`);
+      for (const f of missing.slice(0, 15)) {
+        process.stdout.write(`  ${f.file}:${f.line}  ${f.symbol}  — undocumented: ${f.undocumented.join(', ')}
+`);
+      }
+      if (missing.length > 15) process.stdout.write(`  … and ${missing.length - 15} more\n`);
+      process.stdout.write('\n');
+    }
+    return broken.length > 0 ? 1 : 0;
   }
 
   if (cmd === 'insight') {

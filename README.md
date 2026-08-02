@@ -111,6 +111,7 @@ Verify any download against `SHA256SUMS.txt` on the release.
 npx @northtek/overstory build     # build the tree (resumable; reuses unchanged files)
 npx @northtek/overstory serve     # open the app: ask your codebase, answers notarized
 npx @northtek/overstory drift     # docs you didn't update for code you did (no tree needed)
+npx @northtek/overstory contract  # documented params that disagree with the signature
 npx @northtek/overstory verify    # CI-friendly: exit 1 if any receipt fails
 npx @northtek/overstory mcp       # MCP tools for Claude Code / Cursor
 npx @northtek/overstory site      # shareable single-file explorer
@@ -214,6 +215,30 @@ That misses a body change like `return a + b` becoming `return a - b` under an u
 comment; `--include-body` catches those at the cost of firing on ordinary refactors. The
 narrow default is deliberate, and the trade is written down in
 [docs/drift-design.md](docs/drift-design.md).
+
+## Drift it can prove
+
+`overstory drift` reports drift it *suspects* — code moved, a comment did not. `overstory
+contract` reports drift it can **prove**: a doc block that names a parameter the function does
+not have is simply wrong, and no diff, history or model is needed to say so.
+
+```console
+$ npx @northtek/overstory contract
+
+  1 documented parameter that no longer exists
+
+  src/schema.js:2471  create(discriminator, options, params)
+    documents: types  — not in the signature
+```
+
+That example is real. Pointed at [zod](https://github.com/colinhacks/zod), it immediately found
+`@param types an array of object schemas` sitting above a function whose signature reads
+`create(discriminator, options, params)` — renamed long ago, documentation never followed.
+
+Reads `@param` (JSDoc, Javadoc, PHPDoc), `:param x:` (Sphinx) and Google-style `Args:` blocks,
+above or below the declaration. Prose that merely mentions parameters is deliberately not
+parsed: guessing a contract out of English would manufacture findings, and a false accusation
+costs more than a miss.
 
 ## Where to look first
 

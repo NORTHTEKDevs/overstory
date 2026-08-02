@@ -6,6 +6,29 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-02
+
+Drift it can prove, rather than drift it suspects.
+
+### Added
+
+- **`overstory contract`** checks documented parameter lists against real signatures. A doc
+  block naming `@param encoding` on a function that takes no `encoding` is not a judgement
+  call — it is wrong, and the check needs no diff, no history, no tree and no model. Supports
+  JSDoc/Javadoc/PHPDoc `@param`, reStructuredText `:param x:`, and Google-style `Args:` blocks,
+  above or below the declaration.
+- Exit code 1 when a documented parameter no longer exists; undocumented parameters are
+  reported separately and never fail, because plenty of teams document only what matters.
+
+Pointed at `zod` it immediately found real drift: `@param types an array of object schemas`
+on a function whose signature reads `create(discriminator, options, params)` — the parameter
+was renamed and the doc never followed.
+
+### Notes
+
+Prose that merely mentions parameters is deliberately not parsed. Guessing a contract from
+English would manufacture findings, and a false accusation costs more than a miss.
+
 ## [0.7.0] - 2026-08-02
 
 Measured the detector against twelve languages and found it only worked in seven.
@@ -267,7 +290,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.5.0...v0.6.0
