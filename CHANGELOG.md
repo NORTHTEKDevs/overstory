@@ -6,6 +6,22 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-03
+
+The provable check joins the pull-request Action.
+
+### Added
+
+- **`overstory contract --base <ref>`** scopes the check to files changed since a ref. An
+  audit wants the whole repository; a review bot that dumps pre-existing findings on an
+  unrelated pull request is a bot that gets uninstalled.
+- **The Action now runs both checks.** Drift (suspected: code moved, comment did not) and
+  contract (provable: a documented parameter that does not exist), each scoped to the PR's
+  own footprint, merged into the single self-updating comment with the provable section
+  first. `check-contract` defaults on; `fail-on-broken-contract` defaults off, same
+  philosophy as `fail-on-drift`.
+- A `contract-count` output for workflows that want to gate on it themselves.
+
 ## [0.9.1] - 2026-08-03
 
 The Python round of the survey: six popular packages, 298 files, zero genuine defects — and
@@ -343,7 +359,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.7.0...v0.8.0

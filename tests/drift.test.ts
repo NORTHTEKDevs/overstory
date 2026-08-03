@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectDrift, driftInFile, indexSymbols, parseDiff } from '../src/drift/detect.js';
+import { changedFiles, detectDrift, driftInFile, indexSymbols, parseDiff } from '../src/drift/detect.js';
 
 describe('parseDiff', () => {
   it('reads new-side line ranges from hunk headers', () => {
@@ -209,5 +209,27 @@ describe('indexSymbols', () => {
     const idx = indexSymbols(['/** Does a thing here. */', 'export const go = (a) => a;', ''].join('\n'));
     expect(idx.get('go')?.comment).toBe('Does a thing here.');
     expect(idx.get('go')?.decl).toBe('export const go = (a) => a;');
+  });
+});
+
+describe('changedFiles', () => {
+  it('lists changed paths against a base, normalising separators', async () => {
+    const BACKSLASH = String.fromCharCode(92); // escape-proof: heredocs and JS both mangle \\
+    const out = await changedFiles('/repo', {
+      base: 'main',
+      runGit: async (args) => {
+        expect(args).toContain('--name-only');
+        expect(args).toContain('main');
+        return `src/a.ts\nsrc${BACKSLASH}win.ts\n\n`;
+      },
+    });
+    expect(out).toEqual(['src/a.ts', 'src/win.ts']);
+  });
+
+  it('returns null outside a repository so callers can refuse loudly', async () => {
+    const out = await changedFiles('/repo', {
+      runGit: async () => { throw new Error('fatal: not a git repository'); },
+    });
+    expect(out).toBeNull();
   });
 });

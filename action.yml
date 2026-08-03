@@ -16,6 +16,16 @@ inputs:
       Turn this on once the team trusts the signal.
     required: false
     default: 'false'
+  check-contract:
+    description: >
+      Also run the contract check (documented parameter lists vs real signatures) on the
+      files this pull request changed. These findings are provable, not suspected.
+    required: false
+    default: 'true'
+  fail-on-broken-contract:
+    description: 'Fail the check when a documented parameter provably does not exist. Off by default.'
+    required: false
+    default: 'false'
   include-body:
     description: 'Also flag changes below the declaration line. Noisier; off by default.'
     required: false
@@ -29,6 +39,9 @@ outputs:
   drift-count:
     description: 'Number of changed symbols whose docs did not move.'
     value: ${{ steps.drift.outputs.count }}
+  contract-count:
+    description: 'Number of documented parameters that provably do not exist, in changed files.'
+    value: ${{ steps.drift.outputs.contract }}
 
 runs:
   using: composite
@@ -39,6 +52,7 @@ runs:
       env:
         INPUT_BASE: ${{ inputs.base }}
         INPUT_INCLUDE_BODY: ${{ inputs.include-body }}
+        INPUT_CHECK_CONTRACT: ${{ inputs.check-contract }}
         PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       run: |
         set -uo pipefail
@@ -46,6 +60,7 @@ runs:
         if [ -z "$BASE" ]; then
           echo "No base ref available; supply the 'base' input outside a pull request." >&2
           echo "count=0" >> "$GITHUB_OUTPUT"
+          echo "contract=0" >> "$GITHUB_OUTPUT"
           exit 0
         fi
         # The checkout is usually shallow, so the base commit may be absent locally.
@@ -56,6 +71,16 @@ runs:
         COUNT=$(node -p "try{JSON.parse(require('fs').readFileSync('drift.json','utf8')).findings.length}catch(e){0}")
         echo "count=$COUNT" >> "$GITHUB_OUTPUT"
         echo "Found $COUNT changed symbol(s) whose docs did not move."
+        # Contract findings are PROVABLE (a documented parameter that does not exist), and
+        # scoped by --base to the files this change touched — a bot that reports pre-existing
+        # findings on an unrelated pull request is a bot that gets uninstalled.
+        CCOUNT=0
+        if [ "$INPUT_CHECK_CONTRACT" = "true" ]; then
+          npx --yes @northtek/overstory contract . --base "$BASE" --json > contract.json || true
+          CCOUNT=$(node -p "try{JSON.parse(require('fs').readFileSync('contract.json','utf8')).findings.filter(f=>f.documentedButMissing.length>0).length}catch(e){0}")
+        fi
+        echo "contract=$CCOUNT" >> "$GITHUB_OUTPUT"
+        echo "Found $CCOUNT documented parameter(s) that provably do not exist in changed files."
 
     - name: comment on the pull request
       if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
@@ -66,20 +91,39 @@ runs:
           let report;
           try { report = JSON.parse(fs.readFileSync('drift.json', 'utf8')); } catch { return; }
           const findings = report.findings || [];
+          let broken = [];
+          try {
+            const c = JSON.parse(fs.readFileSync('contract.json', 'utf8'));
+            broken = (c.findings || []).filter((f) => f.documentedButMissing.length > 0);
+          } catch { /* contract check disabled or produced nothing */ }
           const MARKER = '<!-- overstory-drift -->';
 
-          const body = findings.length === 0
+          const sections = [];
+          if (broken.length > 0) {
+            sections.push(
+              `**${broken.length} documented parameter${broken.length === 1 ? '' : 's'} that provably do${broken.length === 1 ? 'es' : ''} not exist** (in files this PR touches):`,
+              '',
+              ...broken.slice(0, 15).map((f) =>
+                `- \`${f.file}:${f.line}\` — **${f.symbol}** documents \`${f.documentedButMissing.join('`, `')}\`${f.suggestion ? `\n  > ${f.suggestion}` : ''}`),
+              broken.length > 15 ? `…and ${broken.length - 15} more.` : '',
+              '',
+            );
+          }
+          if (findings.length > 0) {
+            sections.push(
+              `**${findings.length} changed symbol${findings.length === 1 ? '' : 's'} whose doc comment${findings.length === 1 ? '' : 's'} did not move:**`,
+              '',
+              ...findings.slice(0, 20).map((f) =>
+                `- \`${f.file}:${f.line}\` — **${f.symbol}**\n  > ${f.comment}`),
+              findings.length > 20 ? `…and ${findings.length - 20} more.` : '',
+              '',
+              'Either the comment still holds and you can ignore this, or it does not and nobody would have noticed.',
+            );
+          }
+
+          const body = sections.length === 0
             ? `${MARKER}\n**OVERSTORY** — no documentation drift in this change.`
-            : [
-                MARKER,
-                `**OVERSTORY** — ${findings.length} changed symbol${findings.length === 1 ? '' : 's'} whose doc comment${findings.length === 1 ? '' : 's'} did not move:`,
-                '',
-                ...findings.slice(0, 20).map((f) =>
-                  `- \`${f.file}:${f.line}\` — **${f.symbol}**\n  > ${f.comment}`),
-                findings.length > 20 ? `\n…and ${findings.length - 20} more.` : '',
-                '',
-                'Either the comment still holds and you can ignore this, or it does not and nobody would have noticed.',
-              ].join('\n');
+            : [MARKER, '**OVERSTORY**', '', ...sections].join('\n');
 
           // Update one comment in place. Posting per push trains people to mute the bot.
           const { owner, repo } = context.repo;
@@ -88,14 +132,14 @@ runs:
             .data.find((c) => c.body && c.body.includes(MARKER));
           if (existing) {
             await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-          } else if (findings.length > 0) {
+          } else if (findings.length > 0 || broken.length > 0) {
             // Do not open with a "nothing to see here" comment on a clean pull request.
             await github.rest.issues.createComment({ owner, repo, issue_number, body });
           }
 
     - name: fail when asked to
-      if: ${{ inputs.fail-on-drift == 'true' && steps.drift.outputs.count != '0' }}
+      if: ${{ (inputs.fail-on-drift == 'true' && steps.drift.outputs.count != '0') || (inputs.fail-on-broken-contract == 'true' && steps.drift.outputs.contract != '0') }}
       shell: bash
       run: |
-        echo "Documentation drift found and fail-on-drift is enabled." >&2
+        echo "Documentation problems found and failing was requested." >&2
         exit 1

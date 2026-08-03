@@ -18,7 +18,7 @@ import { credentialsPath, maskKey, readCredentials } from '../core/credentials.j
 import { ollamaModels } from '../llm/ollama.js';
 import { readHistory } from '../git/history.js';
 import { documentationRisk, hotspots, knowledgeConcentration } from '../git/risk.js';
-import { detectDrift } from '../drift/detect.js';
+import { changedFiles, detectDrift } from '../drift/detect.js';
 import { contractMismatches } from '../drift/contract.js';
 import { readFile } from 'node:fs/promises';
 
@@ -35,6 +35,7 @@ Usage:
   overstory mcp    [path]   Serve MCP tools over stdio (map/search/node/verify)
   overstory drift  [path]   Docs you did not update for code you did change (no tree needed)
   overstory contract [path] Documented parameters that disagree with the signature (provable)
+                            (--base <ref> scopes it to files changed since that ref)
   overstory insight [path]  Hotspots, ownership, coupling, and documentation risk (from git)
   overstory providers       Show available models and APIs, and where your keys are
 
@@ -160,8 +161,20 @@ const main = async (): Promise<number> => {
     // Provable drift: a documented parameter list that disagrees with the signature. No diff,
     // no history, no model — this works on a single file the first time you run it.
     const corpus = await loadCorpus(root, { maxFiles: flags.maxFiles });
+    // --base scopes to the files a change actually touched. Repo-wide is right for an audit;
+    // for a pull request it buries the author under pre-existing findings they did not cause.
+    let scope: Set<string> | null = null;
+    if (flags.base) {
+      const changed = await changedFiles(root, { base: flags.base, head: flags.head });
+      if (changed === null) {
+        log('--base given but no git history readable — refusing to fall back to a full scan.');
+        return 2;
+      }
+      scope = new Set(changed);
+    }
     const findings = [];
     for (const file of corpus.files.keys()) {
+      if (scope && !scope.has(file)) continue;
       let content: string;
       try {
         content = await readFile(join(root, file), 'utf8');

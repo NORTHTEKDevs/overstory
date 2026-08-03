@@ -190,6 +190,28 @@ export const driftInFile = (
   return findings;
 };
 
+/** Files changed relative to a base ref (or in the working tree when base is omitted).
+ * Used to scope repo-wide checks to a pull request's actual footprint: a review bot that
+ * reports pre-existing findings on an unrelated PR is a bot that gets uninstalled. */
+export const changedFiles = async (
+  root: string,
+  opts: { base?: string; head?: string; runGit?: (args: string[], cwd: string) => Promise<string> } = {},
+): Promise<string[] | null> => {
+  const runGit = opts.runGit ?? defaultRunGit;
+  const args = ['diff', '--name-only', '--find-renames', '--no-color'];
+  if (opts.base && opts.head) args.push(`${opts.base}...${opts.head}`);
+  else if (opts.base) args.push(opts.base);
+  try {
+    const raw = await runGit(args, root);
+    return raw
+      .split('\n')
+      .map((l) => l.trim().replace(/\\/gu, '/'))
+      .filter((l) => l.length > 0);
+  } catch {
+    return null; // not a repository: caller decides whether to fall back to a full scan
+  }
+};
+
 export interface DriftReport {
   available: boolean;
   reason?: string;
