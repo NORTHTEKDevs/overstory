@@ -77,6 +77,22 @@ there as absorbing documented names, and makes no claim about a class without an
 Before that fix, running `contract` on Python code was worse than not running it. Six popular
 packages now scan clean because they *are* clean, not because the tool cannot see them.
 
+## The Go and Rust round, and where `contract` ends
+
+Six popular repos (gin, cobra, chi, ripgrep, serde, clap — 1,499 files): zero findings, zero
+false positives. Before treating that as a clean bill, the corpus was checked for checkable
+claims at all: exactly **one** `# Arguments` block exists across 1,209 Rust files, and Go's
+convention has no parameter tags whatsoever.
+
+So the zeros are real, but they mean something specific: **Go and Rust document by prose, and
+prose makes no machine-checkable parameter claims.** `contract` deliberately does not guess a
+contract out of English, so its useful surface is the tag-based ecosystems — JSDoc, Javadoc,
+PHPDoc, C# XML, Python docstrings. For Go and Rust, `overstory drift` is the applicable check:
+it compares comment movement against signature movement and needs no tags at all.
+
+A tool that reported "clean" here without checking whether it could see anything would be
+lying with a zero. This section exists so it is not.
+
 ## Reproduce it
 
 ```bash
