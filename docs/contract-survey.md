@@ -61,6 +61,22 @@ After the fixes: ramda 8 → 0, axios 3 → 0, lodash's survivors all verified g
 the loop this project is built around — run the checker against reality, treat every false
 positive as a bug in the checker, and publish the numbers either way.
 
+## The Python round
+
+The same method, run against six popular Python packages (requests, flask, click, jinja2,
+rich, pydantic — 298 files): **zero genuine defects confirmed**. That is the honest result,
+and it is reported rather than dressed up.
+
+What the round actually produced was the largest false-positive class found so far: the first
+pass made **40 accusations and every one was wrong**, all a single mistake — `class
+HTTPAdapter(BaseAdapter):` puts *base classes* in its parens, while the convention documents
+constructor parameters in the class docstring. The checker now resolves a Python class
+docstring against its `__init__` signature (joined across lines), treats `*args`/`**kwargs`
+there as absorbing documented names, and makes no claim about a class without an `__init__`.
+
+Before that fix, running `contract` on Python code was worse than not running it. Six popular
+packages now scan clean because they *are* clean, not because the tool cannot see them.
+
 ## Reproduce it
 
 ```bash

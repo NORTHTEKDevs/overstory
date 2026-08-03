@@ -170,6 +170,51 @@ export const declarationParams = (line: string): { params: string[]; enumerable:
   return { params, enumerable: true };
 };
 
+/** Join a declaration that wraps across lines until its parens balance, capped. Returns the
+ * single-line form, or null when balance is never reached inside the cap. */
+export const joinedDeclaration = (lines: string[], start: number, cap = 15): string | null => {
+  let depth = 0;
+  let joined = '';
+  for (let i = start; i < Math.min(lines.length, start + cap); i++) {
+    joined += (i > start ? ' ' : '') + lines[i].trim();
+    for (const ch of lines[i]) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+    }
+    if (depth === 0 && joined.includes('(')) return joined;
+  }
+  return null;
+};
+
+/**
+ * The parameters a Python class actually takes: the ones on its `__init__`.
+ *
+ * `class HTTPAdapter(BaseAdapter):` puts base classes in the parens, not parameters — but the
+ * convention documents constructor params in the CLASS docstring. Reading the paren list as
+ * parameters made every documented Python class in the survey read as defective: 40 out of 40
+ * accusations across requests, flask, click and rich were this one mistake.
+ */
+const initParamsForClass = (
+  lines: string[],
+  classIndex: number,
+): { params: string[]; enumerable: boolean; declaration: string } | null => {
+  const classIndent = lines[classIndex].length - lines[classIndex].trimStart().length;
+  for (let j = classIndex + 1; j < Math.min(lines.length, classIndex + 400); j++) {
+    const line = lines[j];
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    const indent = line.length - line.trimStart().length;
+    // Dedent to the class level (or above) means the class body ended without an __init__.
+    if (indent <= classIndent && j > classIndex + 1) return null;
+    if (/^(?:async\s+)?def\s+__init__\s*\(/u.test(trimmed)) {
+      const joined = joinedDeclaration(lines, j);
+      if (!joined) return { params: [], enumerable: false, declaration: trimmed }; // unbalanced: fail closed
+      return { ...declarationParams(joined), declaration: joined };
+    }
+  }
+  return null;
+};
+
 /** Collect the raw doc lines for a symbol, whichever side of the declaration they sit on. */
 const docLinesFor = (lines: string[], declIndex: number): string[] | null => {
   const above = precedingDoc(lines, declIndex);
@@ -201,17 +246,27 @@ export const contractMismatches = (file: string, content: string): ContractFindi
     // No explicit list means nothing was promised, so nothing can be broken.
     if (documented.length === 0) continue;
 
-    // Read parameters off the declaration line itself, uncapped and paren-balanced. The
-    // rendered signature truncates at six for display, and trusting it here made every
+    // Read parameters off the declaration itself, uncapped and paren-balanced. The rendered
+    // signature truncates at six for display, and trusting it here made every
     // 7-plus-parameter function's tail read as "documented but missing" in the survey.
-    // enumerable=false covers destructuring, IIFE wrappers and multi-line signatures alike:
+    // enumerable=false covers destructuring, IIFE wrappers and unjoinable signatures alike:
     // when the list cannot be named, absence cannot be proven, so nothing is accused.
-    const { params: actual, enumerable } = declarationParams(lines[i]);
+    // A Python class documents its constructor's parameters, so the comparison target for a
+    // `class X(Base):` is `__init__`, never the base-class list in the class's own parens.
+    const isPyClass = /^class\s+[A-Za-z_]\w*\s*\(/u.test(lines[i].trim());
+    const joinedSelf = joinedDeclaration(lines, i) ?? lines[i];
+    const extracted = isPyClass
+      ? initParamsForClass(lines, i)
+      : { ...declarationParams(joinedSelf), declaration: joinedSelf };
+    if (!extracted) continue; // class with no __init__: nothing to check against
+    const { params: actual, enumerable, declaration } = extracted;
     if (!enumerable || actual.length === 0) continue;
 
-    // A variadic parameter swallows any number of documented positional names: `@param obj1,
-    // @param obj2` above `merge(...objs)` is a documentation convention, not a defect.
-    const hasVariadic = /\.\.\.|\*[A-Za-z_]/u.test(lines[i].slice(lines[i].indexOf('(')));
+    // A variadic parameter swallows any number of documented names: `@param obj1` above
+    // `merge(...objs)`, or flask's `:param json:` absorbed by `**kwargs` — documentation
+    // conventions, not defects. Tested against the signature actually compared (a class's
+    // `__init__`, never the class line itself, whose parens hold base classes).
+    const hasVariadic = /\.\.\.|\*[A-Za-z_*]/u.test(declaration.slice(declaration.indexOf('(')));
 
     const lower = new Set(actual.map((p) => p.toLowerCase()));
     const absent = documented.filter((p) => !actual.includes(p) && !lower.has(p.toLowerCase()));

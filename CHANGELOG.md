@@ -6,6 +6,26 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-03
+
+The Python round of the survey: six popular packages, 298 files, zero genuine defects — and
+the largest false-positive class found so far, fixed.
+
+### Fixed
+
+- **Python class docstrings are now checked against `__init__`, not the base-class list.**
+  `class HTTPAdapter(BaseAdapter):` puts base classes in its parens; the convention documents
+  constructor parameters in the class docstring. Reading the parens as parameters produced 40
+  accusations across requests, flask, click and rich — every one false. Running `contract` on
+  Python before this fix was worse than not running it.
+- Multi-line signatures are joined before parameter extraction (bounded), so a wrapped
+  `__init__` no longer reads as unparseable.
+- The variadic guard now tests the signature actually compared: flask documents `:param json:`
+  absorbed by `**kwargs`, which is a convention, not a defect.
+
+After: requests 2→0, flask 3→0, click 7→0, rich 28→0 false accusations, with the JS corpus
+regression-checked unchanged (lodash still 16 genuine findings).
+
 ## [0.9.0] - 2026-08-02
 
 The checker was run against reality, and reality won several rounds.
@@ -323,7 +343,8 @@ First public release.
   re-verifies it against the live repository before accepting it.
 - Providers: local Ollama, deterministic extractive (no LLM), and opt-in Anthropic API.
 
-[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/NORTHTEKDevs/overstory/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/NORTHTEKDevs/overstory/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/NORTHTEKDevs/overstory/compare/v0.6.1...v0.7.0

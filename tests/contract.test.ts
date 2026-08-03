@@ -237,3 +237,63 @@ describe('fix suggestions', () => {
     expect(found[0].suggestion).toBeUndefined();
   });
 });
+
+describe('Python class docstrings check against __init__ (pysurvey class)', () => {
+  // Every one of the 40 accusations in the Python survey was this mistake: reading
+  // `class X(Base):` base classes as a parameter list.
+  const cls = (docLines: string[], initParams: string) => [
+    'class HTTPAdapter(BaseAdapter):',
+    '    """The built-in HTTP Adapter for urllib3.',
+    ...docLines.map((d) => `    ${d}`),
+    '    """',
+    '',
+    `    def __init__(${initParams}):`,
+    '        pass',
+  ].join('\n');
+
+  it('stays silent when the class doc matches __init__', () => {
+    const src = cls([':param pool_connections: pools to cache', ':param pool_maxsize: max connections'], 'self, pool_connections, pool_maxsize');
+    expect(contractMismatches('a.py', src)).toEqual([]);
+  });
+
+  it('accuses when the class doc names a parameter __init__ does not take', () => {
+    const src = cls([':param pool_connections: pools to cache', ':param retries: gone in a refactor'], 'self, pool_connections');
+    const found = contractMismatches('a.py', src);
+    expect(found).toHaveLength(1);
+    expect(found[0].documentedButMissing).toEqual(['retries']);
+  });
+
+  it('joins a multi-line __init__ signature before comparing', () => {
+    const src = [
+      'class Align(JupyterMixin):',
+      '    """Align a renderable.',
+      '',
+      '    Args:',
+      '        renderable: the content',
+      '        vertical: how to align',
+      '    """',
+      '',
+      '    def __init__(',
+      '        self,',
+      '        renderable,',
+      '        vertical,',
+      '    ) -> None:',
+      '        pass',
+    ].join('\n');
+    expect(contractMismatches('align.py', src)).toEqual([]);
+  });
+
+  it('makes no claim about a class with no __init__', () => {
+    const src = [
+      'class Marker(Base):',
+      '    """A marker type.',
+      '',
+      '    :param label: display label',
+      '    """',
+      '',
+      'def elsewhere():',
+      '    pass',
+    ].join('\n');
+    expect(contractMismatches('m.py', src)).toEqual([]);
+  });
+});
