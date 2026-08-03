@@ -16,7 +16,23 @@ export interface ContractFinding {
   documentedButMissing: string[];
   /** Present in the signature but never documented. */
   undocumented: string[];
+  /** Set only when the fix is unambiguous. Never guessed. */
+  suggestion?: string;
 }
+
+/** Suggest a fix only when it is the sole possibility: exactly one documented name vanished
+ * and exactly one undocumented name appeared, which is what a parameter rename looks like
+ * from the doc block's point of view. Anything else stays a report, because a wrong
+ * suggestion teaches people to distrust every suggestion. */
+const inferSuggestion = (documentedButMissing: string[], undocumented: string[]): string | undefined => {
+  if (documentedButMissing.length === 1 && undocumented.length === 1) {
+    return `the parameter looks renamed: update \`@param ${documentedButMissing[0]}\` to \`@param ${undocumented[0]}\``;
+  }
+  if (documentedButMissing.length === 1 && undocumented.length === 0) {
+    return `\`${documentedButMissing[0]}\` no longer exists: remove its doc entry`;
+  }
+  return undefined;
+};
 
 /** Parameter names a doc block claims the symbol takes.
  *
@@ -34,9 +50,15 @@ export const documentedParams = (docLines: string[]): string[] => {
     const trimmed = line.trim();
 
     // @param name — JSDoc, Javadoc, PHPDoc. Braced types and hyphens are optional.
-    const tag = /^[@\\]param\s+(?:\{[^}]*\}\s*)?\[?([A-Za-z_$][\w$]*)/u.exec(trimmed);
+    const tag = /^[@\\]param\s+(?:\{[^}]*\}\s*)?\[?(?:\.\.\.)?\$?([A-Za-z_$][\w$]*)/u.exec(trimmed);
     if (tag) {
       names.push(tag[1]);
+      continue;
+    }
+    // /// <param name="x"> — C# XML documentation comments.
+    const xml = /<param\s+name\s*=\s*"([A-Za-z_$][\w$]*)"/u.exec(trimmed);
+    if (xml) {
+      names.push(xml[1]);
       continue;
     }
     // :param name: — reStructuredText / Sphinx.
@@ -98,6 +120,56 @@ export const signatureParams = (signature: string): string[] => {
     .filter((p) => p.length > 0 && p !== '…' && /^[A-Za-z_$][\w$]*$/u.test(p));
 };
 
+/**
+ * Parameter names read straight off the declaration line, uncapped.
+ *
+ * The rendered signature truncates at six parameters for display, and the survey showed what
+ * happens when a checker trusts a display string: every lodash function with seven or more
+ * parameters had its tail reported as "documented but missing". This walks the real
+ * parameter list with paren/bracket balancing instead.
+ *
+ * `enumerable: false` means the list cannot be trusted for accusations — a destructured
+ * `{ host, port }`, a nested call, or an unbalanced line leaves no single name to check.
+ */
+export const declarationParams = (line: string): { params: string[]; enumerable: boolean } => {
+  const open = line.indexOf('(');
+  if (open < 0) return { params: [], enumerable: false };
+
+  let depth = 0;
+  let end = -1;
+  const segments: string[] = [];
+  let current = '';
+  for (let i = open; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '(' || ch === '[' || ch === '{' || ch === '<') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}' || ch === '>') {
+      depth--;
+      if (depth === 0 && ch === ')') { end = i; break; }
+    } else if (ch === ',' && depth === 1) {
+      segments.push(current);
+      current = '';
+      continue;
+    }
+    if (i > open) current += ch;
+  }
+  if (end < 0) return { params: [], enumerable: false }; // unbalanced: signature spans lines
+  segments.push(current);
+
+  const cleaned = segments.map((s) => s.trim()).filter((s) => s.length > 0);
+  // Any segment that still nests cannot be named — fail closed for the whole list.
+  if (cleaned.some((s) => /[{[(]/u.test(s))) return { params: [], enumerable: false };
+  const params = cleaned
+    .map((p) => {
+      const head = p.split('=')[0].trim();
+      // `x: number` names x, but `std::string s` must keep its namespace intact.
+      const named = head.includes('::') ? head : head.split(':')[0].trim();
+      return nameFromParam(named || p);
+    })
+    .map((p) => p.replace(/^[*&]+/u, '').replace(/^\.\.\./u, '').replace(/^\$/u, ''))
+    .filter((p) => p.length > 0 && /^[A-Za-z_$][\w$]*$/u.test(p));
+  return { params, enumerable: true };
+};
+
 /** Collect the raw doc lines for a symbol, whichever side of the declaration they sit on. */
 const docLinesFor = (lines: string[], declIndex: number): string[] | null => {
   const above = precedingDoc(lines, declIndex);
@@ -129,14 +201,43 @@ export const contractMismatches = (file: string, content: string): ContractFindi
     // No explicit list means nothing was promised, so nothing can be broken.
     if (documented.length === 0) continue;
 
-    const actual = signatureParams(symbol);
-    if (actual.length === 0) continue;
+    // Read parameters off the declaration line itself, uncapped and paren-balanced. The
+    // rendered signature truncates at six for display, and trusting it here made every
+    // 7-plus-parameter function's tail read as "documented but missing" in the survey.
+    // enumerable=false covers destructuring, IIFE wrappers and multi-line signatures alike:
+    // when the list cannot be named, absence cannot be proven, so nothing is accused.
+    const { params: actual, enumerable } = declarationParams(lines[i]);
+    if (!enumerable || actual.length === 0) continue;
 
-    const documentedButMissing = documented.filter((p) => !actual.includes(p));
-    const undocumented = actual.filter((p) => !documented.includes(p));
+    // A variadic parameter swallows any number of documented positional names: `@param obj1,
+    // @param obj2` above `merge(...objs)` is a documentation convention, not a defect.
+    const hasVariadic = /\.\.\.|\*[A-Za-z_]/u.test(lines[i].slice(lines[i].indexOf('(')));
+
+    const lower = new Set(actual.map((p) => p.toLowerCase()));
+    const absent = documented.filter((p) => !actual.includes(p) && !lower.has(p.toLowerCase()));
+    // Some styles write `@param {string} The string to inspect` with no name at all, so the
+    // first prose word gets captured. Real parameter names virtually never start with a
+    // capital; an absent capitalised "name" is more likely English than code. And if ANY
+    // entry looks like prose, the whole block is in the nameless style — make no claims
+    // about it at all, in either direction.
+    const proseEntries = absent.filter((p) => /^[A-Z]/u.test(p));
+    if (proseEntries.length > 0) continue;
+    const documentedButMissing = hasVariadic ? [] : absent;
+
+    // Receiver conventions are never documented and never should be.
+    const RECEIVERS = new Set(['self', 'cls', 'this']);
+    const documentedLower = new Set(documented.map((p) => p.toLowerCase()));
+    const undocumented = actual.filter((p) => !documentedLower.has(p.toLowerCase()) && !RECEIVERS.has(p));
     if (documentedButMissing.length === 0 && undocumented.length === 0) continue;
 
-    findings.push({ file, line: i + 1, symbol, documentedButMissing, undocumented });
+    findings.push({
+      file,
+      line: i + 1,
+      symbol,
+      documentedButMissing,
+      undocumented,
+      suggestion: documentedButMissing.length > 0 ? inferSuggestion(documentedButMissing, undocumented) : undefined,
+    });
   }
   return findings;
 };

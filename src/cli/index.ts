@@ -188,9 +188,9 @@ const main = async (): Promise<number> => {
       for (const f of broken) {
         process.stdout.write(`  ${f.file}:${f.line}  ${f.symbol}
 `);
-        process.stdout.write(`    documents: ${f.documentedButMissing.join(', ')}  — not in the signature
-
-`);
+        process.stdout.write(`    documents: ${f.documentedButMissing.join(', ')}  — not in the signature\n`);
+        if (f.suggestion) process.stdout.write(`    fix:       ${f.suggestion}\n`);
+        process.stdout.write('\n');
       }
     }
     const missing = findings.filter((f) => f.undocumented.length > 0 && f.documentedButMissing.length === 0);

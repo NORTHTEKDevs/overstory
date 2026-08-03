@@ -169,8 +169,12 @@ export const signatureOf = (line: string): string | null => {
   if (parenAt > 0) {
     const head = body.slice(0, parenAt);
     const beforeParen = /([A-Za-z_$][\w$]*)\s*$/u.exec(head);
-    // Only rewrite when something precedes the name, i.e. a return type or modifiers.
-    if (beforeParen && /^[A-Za-z_$][\w$]*[\s*&]/u.test(body)) {
+    // Only rewrite when something precedes the name, i.e. a return type or modifiers — and
+    // never across an assignment. `var add = _curry2(function add(a, b)` would otherwise be
+    // renamed to `_curry2(...)`, which is how a wrapper library's every export got misread
+    // as a defect during the survey. An `=` before the paren means JS assignment, not a
+    // C-family return type.
+    if (beforeParen && /^[A-Za-z_$][\w$]*[\s*&]/u.test(body) && !head.includes('=')) {
       body = body.slice(head.lastIndexOf(beforeParen[1]));
     }
   }

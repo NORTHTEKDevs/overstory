@@ -234,6 +234,11 @@ $ npx @northtek/overstory contract
 That example is real. Pointed at [zod](https://github.com/colinhacks/zod), it immediately found
 `@param types an array of object schemas` sitting above a function whose signature reads
 `create(discriminator, options, params)` — renamed long ago, documentation never followed.
+Surveyed against twelve popular packages (2,529 files, every finding independently verified
+against the source), it confirmed **16 stale doc comments in lodash** and none in the other
+eleven — the numbers, methodology and false-positive analysis are in
+[docs/contract-survey.md](docs/contract-survey.md). Unambiguous findings carry a fix:
+"the parameter looks renamed: update `@param target` to `@param value`".
 
 Reads `@param` (JSDoc, Javadoc, PHPDoc), `:param x:` (Sphinx) and Google-style `Args:` blocks,
 above or below the declaration. Prose that merely mentions parameters is deliberately not
